@@ -27,6 +27,10 @@ class BusinessRequest extends FormRequest
             'vat_number' => ['nullable', 'string', 'regex:/^(GB)?\s*\d{3}\s*\d{4}\s*\d{2}(\s*\d{3})?$/i'],
             // Companies House numbers: 8 characters, optionally with a 2-letter prefix such as SC or NI.
             'company_number' => ['nullable', 'string', 'regex:/^([A-Z]{2}\d{6}|\d{8})$/i'],
+            'estimate_prefix' => ['sometimes', 'string', 'max:20'],
+            'invoice_prefix' => ['sometimes', 'string', 'max:20'],
+            'payment_terms_days' => ['sometimes', 'integer', 'min:0', 'max:365'],
+            'payment_details' => ['nullable', 'string', 'max:2000'],
         ];
     }
 
