@@ -17,8 +17,15 @@ class DashboardTest extends TestCase
 
     public function test_authenticated_users_can_visit_the_dashboard()
     {
-        $this->actingAs($user = User::factory()->create());
+        $this->actingAs(User::factory()->withBusiness()->create());
 
         $this->get('/dashboard')->assertOk();
+    }
+
+    public function test_users_without_a_business_are_sent_to_set_one_up()
+    {
+        $this->actingAs(User::factory()->create());
+
+        $this->get('/dashboard')->assertRedirect('/businesses/create');
     }
 }

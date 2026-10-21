@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Settings\BusinessController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\TeamController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -18,4 +20,14 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/appearance', function () {
         return Inertia::render('settings/appearance');
     })->name('appearance');
+});
+
+Route::middleware(['auth', 'business'])->group(function () {
+    Route::get('settings/business', [BusinessController::class, 'edit'])->name('business.edit');
+    Route::patch('settings/business', [BusinessController::class, 'update'])->name('business.update');
+
+    Route::get('settings/team', [TeamController::class, 'edit'])->name('team.edit');
+    Route::post('settings/team/invitations', [TeamController::class, 'invite'])->name('team.invite');
+    Route::delete('settings/team/invitations/{invitation}', [TeamController::class, 'cancelInvitation'])->name('team.invitations.destroy');
+    Route::delete('settings/team/members/{member}', [TeamController::class, 'removeMember'])->name('team.members.destroy');
 });

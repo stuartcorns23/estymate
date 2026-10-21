@@ -2,6 +2,29 @@ import { LucideIcon } from 'lucide-react';
 
 export interface Auth {
     user: User;
+    business: BusinessSummary | null;
+    businesses: BusinessSummary[];
+}
+
+export interface BusinessSummary {
+    id: number;
+    name: string;
+}
+
+export type BusinessRole = 'owner' | 'admin' | 'member';
+
+export interface Business extends BusinessSummary {
+    email: string | null;
+    phone: string | null;
+    address_line_1: string | null;
+    address_line_2: string | null;
+    city: string | null;
+    county: string | null;
+    postcode: string | null;
+    country: string;
+    vat_number: string | null;
+    company_number: string | null;
+    currency: string;
 }
 
 export interface BreadcrumbItem {

@@ -2,12 +2,15 @@
 
 namespace Database\Factories;
 
+use App\Enums\BusinessRole;
+use App\Models\Business;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
+ * @extends Factory<User>
  */
 class UserFactory extends Factory
 {
@@ -40,5 +43,16 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    /**
+     * Give the user a business they own, set as their current business.
+     */
+    public function withBusiness(BusinessRole $role = BusinessRole::Owner): static
+    {
+        return $this->afterCreating(function (User $user) use ($role) {
+            Business::factory()->create()->addUser($user, $role);
+            $user->refresh();
+        });
     }
 }
