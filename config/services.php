@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        // Signing secret for the Connect webhook endpoint (events from connected accounts).
+        'connect_webhook_secret' => env('STRIPE_CONNECT_WEBHOOK_SECRET'),
+        // Optional platform fee taken from each online payment, in basis points (100 = 1%).
+        'application_fee_bps' => (int) env('STRIPE_APPLICATION_FEE_BPS', 0),
+    ],
+
 ];

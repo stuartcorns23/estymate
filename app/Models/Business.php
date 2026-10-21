@@ -60,6 +60,7 @@ class Business extends Model
     {
         return [
             'send_reminders' => 'boolean',
+            'stripe_charges_enabled' => 'boolean',
             'payment_terms_days' => 'integer',
         ];
     }

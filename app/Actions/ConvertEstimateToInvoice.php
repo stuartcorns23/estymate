@@ -17,7 +17,7 @@ class ConvertEstimateToInvoice
         return DB::transaction(function () use ($estimate) {
             $business = $estimate->business;
 
-            $invoice = $estimate->replicate(['number', 'status', 'type', 'sent_at', 'paid_at', 'source_document_id']);
+            $invoice = $estimate->replicate(['number', 'status', 'type', 'sent_at', 'paid_at', 'source_document_id', 'public_token']);
             $invoice->type = DocumentType::Invoice;
             $invoice->status = DocumentType::Invoice->initialStatus();
             $invoice->number = $business->claimDocumentNumber(DocumentType::Invoice);

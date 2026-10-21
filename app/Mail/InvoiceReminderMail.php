@@ -41,6 +41,8 @@ class InvoiceReminderMail extends Mailable
                 "This is a friendly reminder that invoice {$document->number} was due on {$document->due_date->format('j F Y')}"
                     .' and '.Money::format($document->balanceDue(), $document->currency).' is still outstanding.',
                 '',
+                ($document->business->stripe_charges_enabled ? 'View and pay online: ' : 'View online: ').$document->publicUrl(),
+                '',
                 'If you have already paid, thank you, and please ignore this email. A copy of the invoice is attached.',
                 '',
                 'Thank you,',

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Settings\BusinessController;
 use App\Http\Controllers\Settings\PasswordController;
+use App\Http\Controllers\Settings\PaymentsController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\TeamController;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,12 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'business'])->group(function () {
     Route::get('settings/business', [BusinessController::class, 'edit'])->name('business.edit');
     Route::patch('settings/business', [BusinessController::class, 'update'])->name('business.update');
+
+    Route::get('settings/payments', [PaymentsController::class, 'edit'])->name('payments.edit');
+    Route::post('settings/payments/connect', [PaymentsController::class, 'connect'])->name('payments.connect');
+    Route::get('settings/payments/connect/return', [PaymentsController::class, 'return'])->name('payments.connect.return');
+    Route::get('settings/payments/connect/refresh', [PaymentsController::class, 'refresh'])->name('payments.connect.refresh');
+    Route::delete('settings/payments/connect', [PaymentsController::class, 'disconnect'])->name('payments.disconnect');
 
     Route::get('settings/team', [TeamController::class, 'edit'])->name('team.edit');
     Route::post('settings/team/invitations', [TeamController::class, 'invite'])->name('team.invite');
