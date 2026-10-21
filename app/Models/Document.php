@@ -47,6 +47,8 @@ class Document extends Model
             'subtotal' => 'integer',
             'tax_total' => 'integer',
             'total' => 'integer',
+            'amount_paid' => 'integer',
+            'last_reminder_at' => 'datetime',
             'sent_at' => 'datetime',
             'paid_at' => 'datetime',
         ];
@@ -77,6 +79,57 @@ class Document extends Model
     }
 
     /**
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class)->orderBy('paid_on')->orderBy('id');
+    }
+
+    /**
+     * The schedule that created this invoice, if any.
+     *
+     * @return BelongsTo<RecurringInvoice, $this>
+     */
+    public function recurringInvoice(): BelongsTo
+    {
+        return $this->belongsTo(RecurringInvoice::class);
+    }
+
+    /**
+     * The schedule that repeats this invoice, if any.
+     *
+     * @return HasOne<RecurringInvoice, $this>
+     */
+    public function repeatSchedule(): HasOne
+    {
+        return $this->hasOne(RecurringInvoice::class, 'template_document_id');
+    }
+
+    public function balanceDue(): int
+    {
+        return max(0, $this->total - $this->amount_paid);
+    }
+
+    /**
+     * Recalculate the amount paid and move the invoice in or out of "paid".
+     */
+    public function refreshPayments(): void
+    {
+        $this->amount_paid = (int) $this->payments()->sum('amount');
+
+        if ($this->total > 0 && $this->amount_paid >= $this->total) {
+            $this->status = DocumentStatus::Paid;
+            $this->paid_at ??= $this->payments()->latest('paid_on')->value('paid_on') ?? now();
+        } elseif ($this->status === DocumentStatus::Paid) {
+            $this->status = DocumentStatus::Sent;
+            $this->paid_at = null;
+        }
+
+        $this->save();
+    }
+
+    /**
      * The estimate an invoice was created from.
      *
      * @return BelongsTo<Document, $this>
@@ -101,7 +154,8 @@ class Document extends Model
      */
     public function isEditable(): bool
     {
-        return ! in_array($this->status, [DocumentStatus::Paid, DocumentStatus::Void, DocumentStatus::Invoiced], true);
+        return $this->amount_paid === 0
+            && ! in_array($this->status, [DocumentStatus::Paid, DocumentStatus::Void, DocumentStatus::Invoiced], true);
     }
 
     /**

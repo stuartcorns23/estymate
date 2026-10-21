@@ -4,10 +4,13 @@ use App\Enums\DocumentType;
 use App\Http\Controllers\BusinessController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CurrentBusinessController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentActionController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\RecurringInvoiceController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -23,12 +26,11 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth', 'business'])->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
-    })->name('dashboard');
+    Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::resource('clients', ClientController::class)->except('show');
     Route::resource('products', ProductController::class)->except('show');
+    Route::resource('recurring-invoices', RecurringInvoiceController::class)->only(['index', 'update', 'destroy']);
 
     // Estimates and invoices share one controller; the "type" default tells it which.
     foreach (DocumentType::cases() as $type) {
@@ -48,6 +50,12 @@ Route::middleware(['auth', 'business'])->group(function () {
 
             if ($type === DocumentType::Estimate) {
                 $routes[] = Route::post('{document}/convert', [DocumentActionController::class, 'convert'])->name('convert');
+            }
+
+            if ($type === DocumentType::Invoice) {
+                $routes[] = Route::post('{document}/payments', [PaymentController::class, 'store'])->name('payments.store');
+                $routes[] = Route::delete('{document}/payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
+                $routes[] = Route::post('{document}/recurring', [RecurringInvoiceController::class, 'store'])->name('recurring.store');
             }
 
             foreach ($routes as $route) {

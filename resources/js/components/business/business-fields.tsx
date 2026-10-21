@@ -2,7 +2,7 @@ import InputError from '@/components/input-error';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-export interface BusinessForm {
+export type BusinessForm = {
     name: string;
     email: string;
     phone: string;
@@ -13,8 +13,7 @@ export interface BusinessForm {
     postcode: string;
     vat_number: string;
     company_number: string;
-    [key: string]: string;
-}
+};
 
 interface Field {
     name: keyof BusinessForm & string;

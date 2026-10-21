@@ -29,6 +29,7 @@ export interface Business extends BusinessSummary {
     invoice_prefix: string;
     payment_terms_days: number;
     payment_details: string | null;
+    send_reminders: boolean;
 }
 
 export interface BreadcrumbItem {
@@ -123,9 +124,15 @@ export interface DocumentSummary {
     number: string;
     status: DocumentStatus;
     is_overdue: boolean;
+    balance_due: number;
     issue_date: string;
     due_date: string | null;
     client_name: string | null;
     total: number;
     currency: string;
+}
+
+export interface Option {
+    value: string;
+    label: string;
 }

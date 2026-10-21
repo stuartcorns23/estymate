@@ -124,7 +124,9 @@ class DocumentTest extends TestCase
 
         $this->assertSame(1200, $invoice->fresh()->total);
 
-        $this->patch("/invoices/{$invoice->id}/status", ['status' => 'paid'])->assertRedirect();
+        $this->patch("/invoices/{$invoice->id}/status", ['status' => 'sent'])->assertRedirect();
+        $this->post("/invoices/{$invoice->id}/payments", ['amount' => '12.00', 'paid_on' => today()->toDateString(), 'method' => 'bank_transfer'])
+            ->assertSessionHasNoErrors();
         $this->assertNotNull($invoice->fresh()->paid_at);
 
         $this->put("/invoices/{$invoice->id}", $this->payload())->assertForbidden();
