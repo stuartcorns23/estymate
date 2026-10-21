@@ -10,13 +10,20 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\PublicDocumentController;
 use App\Http\Controllers\RecurringInvoiceController;
+use App\Http\Controllers\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
+
+Route::get('d/{token}', [PublicDocumentController::class, 'show'])->name('public.documents.show');
+Route::get('d/{token}/pdf', [PublicDocumentController::class, 'pdf'])->name('public.documents.pdf');
+Route::post('d/{token}/pay', [PublicDocumentController::class, 'pay'])->middleware('throttle:10,1')->name('public.documents.pay');
+Route::post('stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('businesses/create', [BusinessController::class, 'create'])->name('businesses.create');

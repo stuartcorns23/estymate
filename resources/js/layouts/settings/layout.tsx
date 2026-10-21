@@ -17,6 +17,11 @@ const sidebarNavItems: NavItem[] = [
         icon: null,
     },
     {
+        title: 'Payments',
+        url: '/settings/payments',
+        icon: null,
+    },
+    {
         title: 'Team',
         url: '/settings/team',
         icon: null,

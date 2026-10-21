@@ -24,7 +24,7 @@ class IssueRecurringInvoice
             $issueDate = $schedule->next_issue_date->copy();
 
             $invoice = $template->replicate([
-                'number', 'status', 'sent_at', 'paid_at', 'amount_paid', 'reminders_sent', 'last_reminder_at', 'source_document_id',
+                'number', 'status', 'sent_at', 'paid_at', 'amount_paid', 'reminders_sent', 'last_reminder_at', 'source_document_id', 'public_token',
             ]);
             $invoice->type = DocumentType::Invoice;
             $invoice->status = DocumentStatus::Draft;

@@ -106,6 +106,7 @@ class DocumentController extends Controller
                 'is_deletable' => $document->isDeletable(),
                 'email_message' => DocumentActionController::defaultMessage($document),
                 'amount_paid' => $document->amount_paid,
+                'public_url' => $document->publicUrl(),
                 'balance_due' => $document->balanceDue(),
                 'payments' => $document->payments->map(fn (Payment $payment) => [
                     'id' => $payment->id,

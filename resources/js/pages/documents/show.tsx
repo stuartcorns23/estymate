@@ -30,7 +30,7 @@ import {
     type SharedData,
 } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { ChevronDown, Download, FileOutput, Mail, Pencil, PoundSterling, Repeat, Trash2 } from 'lucide-react';
+import { ChevronDown, Download, FileOutput, Link as LinkIcon, Mail, Pencil, PoundSterling, Repeat, Trash2 } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 interface Item {
@@ -59,6 +59,7 @@ interface DocumentDetail extends DocumentSummary {
     email_message: string;
     amount_paid: number;
     balance_due: number;
+    public_url: string;
     payments: { id: number; amount: number; paid_on: string; method: string; reference: string | null }[];
     repeat_schedule: { frequency: string; next_issue_date: string; is_active: boolean } | null;
 }
@@ -331,6 +332,14 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
     const canRepeat = isInvoice && document.status !== 'void' && !document.repeat_schedule;
     const canChangeStatus = document.status !== 'invoiced' && document.amount_paid === 0;
 
+    const [copied, setCopied] = useState(false);
+    const copyLink = () => {
+        navigator.clipboard?.writeText(document.public_url).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
     const setStatus = (status: DocumentStatus) => {
         router.patch(route(`${type.plural}.status`, document.id), { status }, { preserveScroll: true });
     };
@@ -357,6 +366,9 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                                     </Link>
                                 </Button>
                             )}
+                            <Button variant="outline" onClick={copyLink}>
+                                <LinkIcon /> {copied ? 'Copied' : 'Client link'}
+                            </Button>
                             <Button variant="outline" asChild>
                                 <a href={route(`${type.plural}.pdf`, document.id)}>
                                     <Download /> PDF

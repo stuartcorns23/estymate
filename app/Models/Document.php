@@ -13,11 +13,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Document extends Model
 {
     /** @use HasFactory<DocumentFactory> */
     use BelongsToBusiness, HasFactory, SoftDeletes;
+
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'public_token',
+    ];
 
     /**
      * The attributes that are mass assignable.
@@ -52,6 +62,36 @@ class Document extends Model
             'sent_at' => 'datetime',
             'paid_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Document $document) {
+            $document->public_token ??= Str::random(40);
+        });
+    }
+
+    /**
+     * The page clients use to view, download and pay this document without an account.
+     */
+    public function publicUrl(): string
+    {
+        if (! $this->public_token) {
+            $this->forceFill(['public_token' => Str::random(40)])->save();
+        }
+
+        return route('public.documents.show', $this->public_token);
+    }
+
+    /**
+     * Whether the client can pay this invoice online right now.
+     */
+    public function canBePaidOnline(): bool
+    {
+        return $this->type === DocumentType::Invoice
+            && $this->status === DocumentStatus::Sent
+            && $this->balanceDue() > 0
+            && $this->business->stripe_charges_enabled;
     }
 
     /**

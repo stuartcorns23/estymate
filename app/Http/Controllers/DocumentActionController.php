@@ -88,6 +88,11 @@ class DocumentActionController extends Controller
             $lines[] = "Payment is due by {$document->due_date->format('j F Y')}.";
         }
 
+        $lines[] = '';
+        $lines[] = $document->type === DocumentType::Invoice && $business->stripe_charges_enabled
+            ? "View and pay online: {$document->publicUrl()}"
+            : "View online: {$document->publicUrl()}";
+
         return implode("\n", [...$lines, '', 'Thank you,', $business->name]);
     }
 
