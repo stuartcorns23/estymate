@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\Business;
 use App\Services\Stripe\StripeClientGateway;
 use App\Services\Stripe\StripeGateway;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Cashier\Cashier;
 use Stripe\StripeClient;
 
 class AppServiceProvider extends ServiceProvider
@@ -25,6 +27,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Businesses, not users, subscribe to Estymate.
+        Cashier::useCustomerModel(Business::class);
     }
 }

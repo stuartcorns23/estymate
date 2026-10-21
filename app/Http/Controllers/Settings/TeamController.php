@@ -46,6 +46,7 @@ class TeamController extends Controller
         $business = $request->user()->currentBusiness;
 
         Gate::authorize('manageTeam', $business);
+        $business->ensureWithinLimit('team_members');
 
         $validated = $request->validate([
             'email' => [

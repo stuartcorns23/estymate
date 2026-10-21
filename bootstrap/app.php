@@ -20,7 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         // Stripe signs its webhooks, so they don't carry a CSRF token.
-        $middleware->validateCsrfTokens(except: ['stripe/webhook']);
+        $middleware->validateCsrfTokens(except: ['stripe/webhook', 'billing/webhook']);
 
         $middleware->alias([
             'business' => EnsureCurrentBusiness::class,

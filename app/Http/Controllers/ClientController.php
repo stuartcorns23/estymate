@@ -29,13 +29,17 @@ class ClientController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $request->user()->currentBusiness->ensureWithinLimit('clients');
+
         return Inertia::render('clients/form', ['client' => null]);
     }
 
     public function store(ClientRequest $request): RedirectResponse
     {
+        $request->user()->currentBusiness->ensureWithinLimit('clients');
+
         Client::create($request->validated());
 
         return to_route('clients.index');

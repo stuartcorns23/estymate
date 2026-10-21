@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Billing\Plan;
+use App\Billing\PlanLimitReached;
 use App\Enums\BusinessRole;
 use App\Enums\DocumentType;
 use Database\Factories\BusinessFactory;
@@ -9,11 +11,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Laravel\Cashier\Billable;
 
 class Business extends Model
 {
     /** @use HasFactory<BusinessFactory> */
-    use HasFactory;
+    use Billable, HasFactory;
 
     /**
      * UK VAT rates every new business starts with.
@@ -61,12 +64,29 @@ class Business extends Model
         return [
             'send_reminders' => 'boolean',
             'stripe_charges_enabled' => 'boolean',
+            'trial_ends_at' => 'datetime',
             'payment_terms_days' => 'integer',
         ];
     }
 
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'stripe_id',
+        'pm_type',
+        'pm_last_four',
+        'plan_override',
+    ];
+
     protected static function booted(): void
     {
+        static::creating(function (Business $business) {
+            $business->trial_ends_at ??= now()->addDays(config('plans.trial_days'));
+        });
+
         static::created(function (Business $business) {
             $business->taxRates()->createMany(self::DEFAULT_TAX_RATES);
         });
@@ -164,5 +184,67 @@ class Business extends Model
             'estimates_this_month' => (int) ($documentsThisMonth[DocumentType::Estimate->value] ?? 0),
             'invoices_this_month' => (int) ($documentsThisMonth[DocumentType::Invoice->value] ?? 0),
         ];
+    }
+
+    /**
+     * The plan the business is on: a comped plan, its subscription, its free trial, or the default.
+     */
+    public function plan(): Plan
+    {
+        if ($this->plan_override) {
+            return Plan::find($this->plan_override);
+        }
+
+        $subscription = $this->subscription();
+
+        if ($subscription?->valid()) {
+            return Plan::forStripePrice($subscription->stripe_price) ?? Plan::find(config('plans.default'));
+        }
+
+        if ($this->onGenericTrial()) {
+            return Plan::find(config('plans.trial_plan'));
+        }
+
+        return Plan::find(config('plans.default'));
+    }
+
+    /**
+     * Whether the business is using the free trial rather than a paid or comped plan.
+     */
+    public function isOnFreeTrial(): bool
+    {
+        return ! $this->plan_override && ! $this->subscribed() && $this->onGenericTrial();
+    }
+
+    /**
+     * How much of each limited resource the business is using now.
+     *
+     * @return array<string, int>
+     */
+    public function planUsage(): array
+    {
+        $usage = $this->usage();
+
+        return [
+            'clients' => $usage['clients'],
+            'invoices_per_month' => $usage['invoices_this_month'],
+            'estimates_per_month' => $usage['estimates_this_month'],
+            'team_members' => $this->users()->count() + $this->invitations()->count(),
+        ];
+    }
+
+    /**
+     * Stop here if adding one more of the resource would go over the plan's limit.
+     *
+     * @throws PlanLimitReached
+     */
+    public function ensureWithinLimit(string $resource): void
+    {
+        $plan = $this->plan();
+        $limit = $plan->limit($resource);
+
+        if ($limit !== null && $this->planUsage()[$resource] >= $limit) {
+            throw new PlanLimitReached($plan, $resource);
+        }
     }
 }

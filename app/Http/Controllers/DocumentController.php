@@ -56,6 +56,7 @@ class DocumentController extends Controller
     {
         $type = $this->type($request);
         $business = $request->user()->currentBusiness;
+        $business->ensureWithinLimit("{$type->plural()}_per_month");
 
         $source = $request->integer('client_id') ? Client::find($request->integer('client_id')) : null;
 
@@ -75,6 +76,7 @@ class DocumentController extends Controller
     public function store(DocumentRequest $request, SaveDocument $saveDocument): RedirectResponse
     {
         $type = $this->type($request);
+        $request->user()->currentBusiness->ensureWithinLimit("{$type->plural()}_per_month");
 
         $document = $saveDocument->handle(new Document, $type, $request->validated());
 

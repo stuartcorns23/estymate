@@ -50,6 +50,10 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user,
                 'business' => $user?->currentBusiness?->only('id', 'name'),
+                'plan' => fn () => $user?->currentBusiness ? [
+                    'name' => $user->currentBusiness->plan()->name,
+                    'trial_ends_at' => $user->currentBusiness->isOnFreeTrial() ? $user->currentBusiness->trial_ends_at->toDateString() : null,
+                ] : null,
                 'businesses' => $user?->businesses()->orderBy('name')->get(['businesses.id', 'businesses.name'])
                     ->map->only('id', 'name'),
             ],
