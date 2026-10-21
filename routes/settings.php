@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\BillingController;
 use App\Http\Controllers\Settings\BusinessController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\PaymentsController;
@@ -26,6 +27,10 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'business'])->group(function () {
     Route::get('settings/business', [BusinessController::class, 'edit'])->name('business.edit');
     Route::patch('settings/business', [BusinessController::class, 'update'])->name('business.update');
+
+    Route::get('settings/billing', [BillingController::class, 'edit'])->name('billing.edit');
+    Route::post('settings/billing/checkout/{plan}', [BillingController::class, 'checkout'])->name('billing.checkout');
+    Route::post('settings/billing/portal', [BillingController::class, 'portal'])->name('billing.portal');
 
     Route::get('settings/payments', [PaymentsController::class, 'edit'])->name('payments.edit');
     Route::post('settings/payments/connect', [PaymentsController::class, 'connect'])->name('payments.connect');

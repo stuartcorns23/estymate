@@ -1,5 +1,6 @@
 <?php
 
+use App\Billing\Plan;
 use App\Enums\DocumentType;
 use App\Http\Controllers\BusinessController;
 use App\Http\Controllers\ClientController;
@@ -17,7 +18,10 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    return Inertia::render('welcome');
+    return Inertia::render('welcome', [
+        'plans' => array_map(fn (Plan $plan) => $plan->toArray(), Plan::all()),
+        'trialDays' => config('plans.trial_days'),
+    ]);
 })->name('home');
 
 Route::get('d/{token}', [PublicDocumentController::class, 'show'])->name('public.documents.show');

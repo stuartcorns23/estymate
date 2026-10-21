@@ -4,6 +4,15 @@ export interface Auth {
     user: User;
     business: BusinessSummary | null;
     businesses: BusinessSummary[];
+    plan: { name: string; trial_ends_at: string | null } | null;
+}
+
+export interface PlanInfo {
+    key: string;
+    name: string;
+    price: number;
+    limits: Record<'clients' | 'invoices_per_month' | 'estimates_per_month' | 'team_members', number | null>;
+    purchasable: boolean;
 }
 
 export interface BusinessSummary {

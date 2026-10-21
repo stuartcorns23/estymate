@@ -65,6 +65,7 @@ class DocumentActionController extends Controller
 
         abort_unless($document->type === DocumentType::Estimate, 404);
         abort_if(in_array($document->status, [DocumentStatus::Invoiced, DocumentStatus::Declined], true), 403);
+        $document->business->ensureWithinLimit('invoices_per_month');
 
         $invoice = $convert->handle($document);
 
