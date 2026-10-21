@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\BusinessRole;
+use App\Enums\DocumentType;
 use Database\Factories\BusinessFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -43,6 +44,10 @@ class Business extends Model
         'vat_number',
         'company_number',
         'currency',
+        'estimate_prefix',
+        'invoice_prefix',
+        'payment_terms_days',
+        'payment_details',
     ];
 
     protected static function booted(): void
@@ -88,5 +93,61 @@ class Business extends Model
         if ($user->current_business_id === null) {
             $user->forceFill(['current_business_id' => $this->id])->save();
         }
+    }
+
+    /**
+     * @return HasMany<Client, $this>
+     */
+    public function clients(): HasMany
+    {
+        return $this->hasMany(Client::class)->withoutGlobalScopes();
+    }
+
+    /**
+     * @return HasMany<Document, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class)->withoutGlobalScopes();
+    }
+
+    /**
+     * Claim the next document number for the type, e.g. "INV-0007".
+     *
+     * Call inside a transaction so two people saving at once can't get the same number.
+     */
+    public function claimDocumentNumber(DocumentType $type): string
+    {
+        $column = "next_{$type->value}_number";
+        $prefix = $type === DocumentType::Estimate ? $this->estimate_prefix : $this->invoice_prefix;
+
+        $next = (int) static::whereKey($this->id)->lockForUpdate()->value($column);
+        static::whereKey($this->id)->update([$column => $next + 1]);
+        $this->{$column} = $next + 1;
+
+        return $prefix.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * How much the business has used, for subscription plan limits.
+     *
+     * Deleted clients and documents still count towards the month they were created in.
+     *
+     * @return array{clients: int, estimates_this_month: int, invoices_this_month: int}
+     */
+    public function usage(): array
+    {
+        $documentsThisMonth = $this->documents()
+            ->withTrashed()
+            ->where('created_at', '>=', now()->startOfMonth())
+            ->selectRaw('type, count(*) as aggregate')
+            ->groupBy('type')
+            ->pluck('aggregate', 'type');
+
+        return [
+            'clients' => $this->clients()->count(),
+            'estimates_this_month' => (int) ($documentsThisMonth[DocumentType::Estimate->value] ?? 0),
+            'invoices_this_month' => (int) ($documentsThisMonth[DocumentType::Invoice->value] ?? 0),
+        ];
     }
 }

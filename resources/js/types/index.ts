@@ -25,6 +25,10 @@ export interface Business extends BusinessSummary {
     vat_number: string | null;
     company_number: string | null;
     currency: string;
+    estimate_prefix: string;
+    invoice_prefix: string;
+    payment_terms_days: number;
+    payment_details: string | null;
 }
 
 export interface BreadcrumbItem {
@@ -60,4 +64,68 @@ export interface User {
     created_at: string;
     updated_at: string;
     [key: string]: unknown; // This allows for additional properties...
+}
+
+export interface Paginated<T> {
+    data: T[];
+    current_page: number;
+    last_page: number;
+    from: number | null;
+    to: number | null;
+    total: number;
+    prev_page_url: string | null;
+    next_page_url: string | null;
+}
+
+export interface TaxRate {
+    id: number;
+    name: string;
+    rate: string;
+    is_default: boolean;
+}
+
+export interface Client {
+    id: number;
+    name: string;
+    contact_name: string | null;
+    email: string | null;
+    phone: string | null;
+    address_line_1: string | null;
+    address_line_2: string | null;
+    city: string | null;
+    county: string | null;
+    postcode: string | null;
+    vat_number: string | null;
+    notes: string | null;
+    documents_count?: number;
+}
+
+export interface Product {
+    id: number;
+    name: string;
+    description: string | null;
+    unit_price: number;
+    unit: string | null;
+    tax_rate_id: number | null;
+    tax_rate?: Pick<TaxRate, 'id' | 'name' | 'rate'> | null;
+}
+
+export type DocumentStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'invoiced' | 'paid' | 'void';
+
+export interface DocumentTypeInfo {
+    value: 'estimate' | 'invoice';
+    label: string;
+    plural: string;
+}
+
+export interface DocumentSummary {
+    id: number;
+    number: string;
+    status: DocumentStatus;
+    is_overdue: boolean;
+    issue_date: string;
+    due_date: string | null;
+    client_name: string | null;
+    total: number;
+    currency: string;
 }
