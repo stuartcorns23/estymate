@@ -3,10 +3,11 @@ import { Transition } from '@headlessui/react';
 import { Head, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
-import BusinessFields, { type BusinessForm } from '@/components/business/business-fields';
+import BusinessFields from '@/components/business/business-fields';
 import HeadingSmall from '@/components/heading-small';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,7 +29,7 @@ interface TaxRate {
 }
 
 export default function BusinessSettings({ business, taxRates, canUpdate }: { business: Business; taxRates: TaxRate[]; canUpdate: boolean }) {
-    const { data, setData, patch, errors, processing, recentlySuccessful } = useForm<BusinessForm>({
+    const { data, setData, patch, errors, processing, recentlySuccessful } = useForm({
         name: business.name,
         email: business.email ?? '',
         phone: business.phone ?? '',
@@ -43,6 +44,7 @@ export default function BusinessSettings({ business, taxRates, canUpdate }: { bu
         invoice_prefix: business.invoice_prefix,
         payment_terms_days: String(business.payment_terms_days),
         payment_details: business.payment_details ?? '',
+        send_reminders: business.send_reminders,
     });
 
     const submit: FormEventHandler = (e) => {
@@ -112,6 +114,21 @@ export default function BusinessSettings({ business, taxRates, canUpdate }: { bu
                             />
                             <p className="text-muted-foreground text-xs">Added to the notes on new invoices.</p>
                             <InputError message={errors.payment_details} />
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <Checkbox
+                                id="send_reminders"
+                                checked={data.send_reminders}
+                                onCheckedChange={(checked) => setData('send_reminders', checked === true)}
+                                disabled={!canUpdate || processing}
+                            />
+                            <div className="grid gap-1">
+                                <Label htmlFor="send_reminders">Send overdue reminders automatically</Label>
+                                <p className="text-muted-foreground text-xs">
+                                    Clients get a polite email the day after an invoice is due, then weekly, up to 3 reminders.
+                                </p>
+                            </div>
                         </div>
 
                         {canUpdate && (

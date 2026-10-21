@@ -105,6 +105,10 @@
             <tr><td class="muted">VAT {{ rtrim(rtrim($vat['rate'], '0'), '.') }}% on {{ $money($vat['net']) }}</td><td class="right">{{ $money($vat['tax']) }}</td></tr>
         @endforeach
         <tr class="grand"><td>Total {{ $document->currency }}</td><td class="right">{{ $money($document->total) }}</td></tr>
+        @if ($document->amount_paid > 0)
+            <tr><td class="muted">Paid</td><td class="right">-{{ $money($document->amount_paid) }}</td></tr>
+            <tr><td><strong>Balance due</strong></td><td class="right"><strong>{{ $money($document->balanceDue()) }}</strong></td></tr>
+        @endif
     </table>
 
     @if ($document->notes)

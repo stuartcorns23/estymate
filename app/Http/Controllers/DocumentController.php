@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Actions\SaveDocument;
 use App\Enums\DocumentStatus;
 use App\Enums\DocumentType;
+use App\Enums\PaymentMethod;
+use App\Enums\RecurringFrequency;
 use App\Http\Requests\DocumentRequest;
 use App\Models\Client;
 use App\Models\Document;
+use App\Models\Payment;
 use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -82,7 +85,7 @@ class DocumentController extends Controller
     {
         $type = $this->type($request, $document);
 
-        $document->load(['client', 'items', 'source:id,type,number', 'convertedTo:id,type,number,source_document_id']);
+        $document->load(['client', 'items', 'payments', 'repeatSchedule', 'source:id,type,number', 'convertedTo:id,type,number,source_document_id']);
 
         return Inertia::render('documents/show', [
             'type' => $this->typeProps($type),
@@ -102,7 +105,29 @@ class DocumentController extends Controller
                 'is_editable' => $document->isEditable(),
                 'is_deletable' => $document->isDeletable(),
                 'email_message' => DocumentActionController::defaultMessage($document),
+                'amount_paid' => $document->amount_paid,
+                'balance_due' => $document->balanceDue(),
+                'payments' => $document->payments->map(fn (Payment $payment) => [
+                    'id' => $payment->id,
+                    'amount' => $payment->amount,
+                    'paid_on' => $payment->paid_on->toDateString(),
+                    'method' => $payment->method->label(),
+                    'reference' => $payment->reference,
+                ]),
+                'repeat_schedule' => $document->repeatSchedule ? [
+                    'frequency' => $document->repeatSchedule->frequency->label(),
+                    'next_issue_date' => $document->repeatSchedule->next_issue_date->toDateString(),
+                    'is_active' => $document->repeatSchedule->is_active,
+                ] : null,
             ],
+            'paymentMethods' => collect(PaymentMethod::manual())->map(fn (PaymentMethod $method) => [
+                'value' => $method->value,
+                'label' => $method->label(),
+            ]),
+            'frequencies' => collect(RecurringFrequency::cases())->map(fn (RecurringFrequency $frequency) => [
+                'value' => $frequency->value,
+                'label' => $frequency->label(),
+            ]),
             'statuses' => collect($type->manualStatuses())->map(fn (DocumentStatus $status) => [
                 'value' => $status->value,
                 'label' => $status->label(),
@@ -162,9 +187,9 @@ class DocumentController extends Controller
         ]);
 
         abort_if($document->status === DocumentStatus::Invoiced, 403, 'This estimate has already been invoiced.');
+        abort_if($document->amount_paid > 0, 403, 'Remove the payments on this invoice before changing its status.');
 
         $document->status = DocumentStatus::from($validated['status']);
-        $document->paid_at = $document->status === DocumentStatus::Paid ? ($document->paid_at ?? now()) : null;
         $document->save();
 
         return back();
@@ -230,6 +255,7 @@ class DocumentController extends Controller
             'number' => $document->number,
             'status' => $document->status->value,
             'is_overdue' => $document->isOverdue(),
+            'balance_due' => $document->balanceDue(),
             'issue_date' => $document->issue_date->toDateString(),
             'due_date' => $document->due_date?->toDateString(),
             'client_name' => $document->client?->name,

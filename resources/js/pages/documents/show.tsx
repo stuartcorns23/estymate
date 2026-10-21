@@ -2,6 +2,7 @@ import DocumentStatusBadge from '@/components/document-status-badge';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogClose,
@@ -15,12 +16,21 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatMoney, formatRate } from '@/lib/money';
-import { type BreadcrumbItem, type Client, type DocumentStatus, type DocumentSummary, type DocumentTypeInfo, type SharedData } from '@/types';
+import {
+    type BreadcrumbItem,
+    type Client,
+    type DocumentStatus,
+    type DocumentSummary,
+    type DocumentTypeInfo,
+    type Option,
+    type SharedData,
+} from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { ChevronDown, Download, FileOutput, Mail, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, Download, FileOutput, Mail, Pencil, PoundSterling, Repeat, Trash2 } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 interface Item {
@@ -47,12 +57,206 @@ interface DocumentDetail extends DocumentSummary {
     is_editable: boolean;
     is_deletable: boolean;
     email_message: string;
+    amount_paid: number;
+    balance_due: number;
+    payments: { id: number; amount: number; paid_on: string; method: string; reference: string | null }[];
+    repeat_schedule: { frequency: string; next_issue_date: string; is_active: boolean } | null;
 }
 
 interface ShowDocumentProps {
     type: DocumentTypeInfo;
     document: DocumentDetail;
     statuses: { value: DocumentStatus; label: string }[];
+    paymentMethods: Option[];
+    frequencies: Option[];
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+function RecordPaymentDialog({ document, paymentMethods }: { document: DocumentDetail; paymentMethods: Option[] }) {
+    const [open, setOpen] = useState(false);
+    const { data, setData, post, processing, errors, reset } = useForm({
+        amount: (document.balance_due / 100).toFixed(2),
+        paid_on: today(),
+        method: 'bank_transfer',
+        reference: '',
+    });
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        post(route('invoices.payments.store', document.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setOpen(false);
+                reset();
+            },
+        });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline">
+                    <PoundSterling /> Record payment
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <form onSubmit={submit} className="space-y-4">
+                    <DialogHeader>
+                        <DialogTitle>Record a payment</DialogTitle>
+                        <DialogDescription>
+                            {formatMoney(document.balance_due, document.currency)} is still owed. The invoice is marked paid once it's covered.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-2">
+                            <Label htmlFor="payment-amount">Amount (£)</Label>
+                            <Input
+                                id="payment-amount"
+                                inputMode="decimal"
+                                required
+                                value={data.amount}
+                                onChange={(e) => setData('amount', e.target.value)}
+                            />
+                            <InputError message={errors.amount} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="payment-date">Date received</Label>
+                            <Input
+                                id="payment-date"
+                                type="date"
+                                required
+                                max={today()}
+                                value={data.paid_on}
+                                onChange={(e) => setData('paid_on', e.target.value)}
+                            />
+                            <InputError message={errors.paid_on} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="payment-method">Method</Label>
+                            <Select value={data.method} onValueChange={(value) => setData('method', value)}>
+                                <SelectTrigger id="payment-method">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {paymentMethods.map((method) => (
+                                        <SelectItem key={method.value} value={method.value}>
+                                            {method.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <InputError message={errors.method} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="payment-reference">Reference</Label>
+                            <Input id="payment-reference" value={data.reference} onChange={(e) => setData('reference', e.target.value)} />
+                            <InputError message={errors.reference} />
+                        </div>
+                    </div>
+
+                    <DialogFooter className="gap-2">
+                        <DialogClose asChild>
+                            <Button type="button" variant="secondary">
+                                Cancel
+                            </Button>
+                        </DialogClose>
+                        <Button disabled={processing}>Record payment</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function RepeatDialog({ document, frequencies }: { document: DocumentDetail; frequencies: Option[] }) {
+    const [open, setOpen] = useState(false);
+    const { data, setData, post, processing, errors } = useForm({
+        frequency: 'monthly',
+        next_issue_date: '',
+        ends_on: '',
+        auto_send: false as boolean,
+    });
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        post(route('invoices.recurring.store', document.id));
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline">
+                    <Repeat /> Repeat
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <form onSubmit={submit} className="space-y-4">
+                    <DialogHeader>
+                        <DialogTitle>Repeat this invoice</DialogTitle>
+                        <DialogDescription>
+                            A new invoice with the same client, lines and notes is created on each date, with your usual payment terms.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-2">
+                            <Label htmlFor="repeat-frequency">How often</Label>
+                            <Select value={data.frequency} onValueChange={(value) => setData('frequency', value)}>
+                                <SelectTrigger id="repeat-frequency">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {frequencies.map((frequency) => (
+                                        <SelectItem key={frequency.value} value={frequency.value}>
+                                            {frequency.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <InputError message={errors.frequency} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="repeat-start">First new invoice on</Label>
+                            <Input
+                                id="repeat-start"
+                                type="date"
+                                required
+                                min={today()}
+                                value={data.next_issue_date}
+                                onChange={(e) => setData('next_issue_date', e.target.value)}
+                            />
+                            <InputError message={errors.next_issue_date} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="repeat-end">Stop after (optional)</Label>
+                            <Input id="repeat-end" type="date" value={data.ends_on} onChange={(e) => setData('ends_on', e.target.value)} />
+                            <InputError message={errors.ends_on} />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <Checkbox
+                            id="repeat-auto-send"
+                            checked={data.auto_send}
+                            onCheckedChange={(checked) => setData('auto_send', checked === true)}
+                        />
+                        <Label htmlFor="repeat-auto-send">Email each new invoice to the client automatically</Label>
+                    </div>
+
+                    <DialogFooter className="gap-2">
+                        <DialogClose asChild>
+                            <Button type="button" variant="secondary">
+                                Cancel
+                            </Button>
+                        </DialogClose>
+                        <Button disabled={processing}>Start repeating</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 function SendDialog({ type, document }: { type: DocumentTypeInfo; document: DocumentDetail }) {
@@ -112,7 +316,7 @@ function SendDialog({ type, document }: { type: DocumentTypeInfo; document: Docu
     );
 }
 
-export default function ShowDocument({ type, document, statuses }: ShowDocumentProps) {
+export default function ShowDocument({ type, document, statuses, paymentMethods, frequencies }: ShowDocumentProps) {
     const { flash } = usePage<SharedData & { flash?: { status?: string } }>().props;
     const isInvoice = type.value === 'invoice';
     const label = type.label.toLowerCase();
@@ -123,6 +327,9 @@ export default function ShowDocument({ type, document, statuses }: ShowDocumentP
     ];
     const canSend = !['void', 'invoiced'].includes(document.status);
     const canConvert = !isInvoice && !['invoiced', 'declined'].includes(document.status);
+    const canRecordPayment = isInvoice && !['draft', 'void', 'paid'].includes(document.status);
+    const canRepeat = isInvoice && document.status !== 'void' && !document.repeat_schedule;
+    const canChangeStatus = document.status !== 'invoiced' && document.amount_paid === 0;
 
     const setStatus = (status: DocumentStatus) => {
         router.patch(route(`${type.plural}.status`, document.id), { status }, { preserveScroll: true });
@@ -160,7 +367,9 @@ export default function ShowDocument({ type, document, statuses }: ShowDocumentP
                                     <FileOutput /> Convert to invoice
                                 </Button>
                             )}
-                            {document.status !== 'invoiced' && (
+                            {canRepeat && <RepeatDialog document={document} frequencies={frequencies} />}
+                            {canRecordPayment && <RecordPaymentDialog document={document} paymentMethods={paymentMethods} />}
+                            {canChangeStatus && (
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="outline">
@@ -202,6 +411,17 @@ export default function ShowDocument({ type, document, statuses }: ShowDocumentP
                             Converted to{' '}
                             <Link href={document.converted_to.url} className="underline">
                                 invoice {document.converted_to.number}
+                            </Link>
+                        </span>
+                    )}
+                    {document.repeat_schedule && (
+                        <span className="text-muted-foreground">
+                            Repeats {document.repeat_schedule.frequency.toLowerCase()}
+                            {document.repeat_schedule.is_active
+                                ? `, next on ${formatDate(document.repeat_schedule.next_issue_date)}`
+                                : ' (paused)'} ·{' '}
+                            <Link href={route('recurring-invoices.index')} className="underline">
+                                Manage
                             </Link>
                         </span>
                     )}
@@ -282,10 +502,47 @@ export default function ShowDocument({ type, document, statuses }: ShowDocumentP
                         ))}
                         <dt className="border-t pt-2 font-semibold">Total</dt>
                         <dd className="border-t pt-2 text-right font-semibold tabular-nums">{money(document.total)}</dd>
+                        {document.amount_paid > 0 && (
+                            <>
+                                <dt className="text-muted-foreground">Paid</dt>
+                                <dd className="text-right tabular-nums">−{money(document.amount_paid)}</dd>
+                                <dt className="font-semibold">Balance due</dt>
+                                <dd className="text-right font-semibold tabular-nums">{money(document.balance_due)}</dd>
+                            </>
+                        )}
                     </dl>
 
                     {document.notes && <p className="text-muted-foreground text-sm whitespace-pre-line">{document.notes}</p>}
                 </div>
+
+                {document.payments.length > 0 && (
+                    <section className="space-y-3">
+                        <h2 className="font-medium">Payments</h2>
+                        <ul className="divide-y rounded-lg border">
+                            {document.payments.map((payment) => (
+                                <li key={payment.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                                    <span>
+                                        <span className="font-medium tabular-nums">{money(payment.amount)}</span>{' '}
+                                        <span className="text-muted-foreground">
+                                            on {formatDate(payment.paid_on)} by {payment.method.toLowerCase()}
+                                            {payment.reference && ` (${payment.reference})`}
+                                        </span>
+                                    </span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                            confirm('Remove this payment?') &&
+                                            router.delete(route('invoices.payments.destroy', [document.id, payment.id]), { preserveScroll: true })
+                                        }
+                                    >
+                                        Remove
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    </section>
+                )}
 
                 {document.is_deletable && (
                     <Button variant="ghost" className="text-destructive" onClick={destroy}>

@@ -48,7 +48,21 @@ class Business extends Model
         'invoice_prefix',
         'payment_terms_days',
         'payment_details',
+        'send_reminders',
     ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'send_reminders' => 'boolean',
+            'payment_terms_days' => 'integer',
+        ];
+    }
 
     protected static function booted(): void
     {

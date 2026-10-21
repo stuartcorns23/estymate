@@ -37,7 +37,8 @@ enum DocumentType: string
     {
         return match ($this) {
             self::Estimate => [DocumentStatus::Draft, DocumentStatus::Sent, DocumentStatus::Accepted, DocumentStatus::Declined],
-            self::Invoice => [DocumentStatus::Draft, DocumentStatus::Sent, DocumentStatus::Paid, DocumentStatus::Void],
+            // Paid is set by recording payments, so it isn't chosen by hand.
+            self::Invoice => [DocumentStatus::Draft, DocumentStatus::Sent, DocumentStatus::Void],
         };
     }
 }
