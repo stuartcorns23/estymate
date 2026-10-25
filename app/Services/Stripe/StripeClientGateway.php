@@ -13,18 +13,20 @@ class StripeClientGateway implements StripeGateway
 
     public function createAccount(string $email, string $businessName): string
     {
-        // Controller properties rather than the legacy type=standard: the business pays
-        // Stripe's fees, Stripe carries loss liability and they get the full Dashboard.
-        return $this->stripe->accounts->create([
-            'controller' => [
-                'fees' => ['payer' => 'account'],
-                'losses' => ['payments' => 'stripe'],
-                'stripe_dashboard' => ['type' => 'full'],
+        // Accounts v2 with the merchant configuration: the business pays Stripe's fees,
+        // Stripe carries loss liability and they get the full Stripe Dashboard.
+        return $this->stripe->v2->core->accounts->create([
+            'contact_email' => $email,
+            'display_name' => $businessName,
+            'dashboard' => 'full',
+            'identity' => ['country' => 'GB'],
+            'defaults' => [
+                'currency' => 'gbp',
+                'responsibilities' => ['fees_collector' => 'stripe', 'losses_collector' => 'stripe'],
             ],
-            'capabilities' => ['card_payments' => ['requested' => true]],
-            'country' => 'GB',
-            'email' => $email,
-            'business_profile' => ['name' => $businessName],
+            'configuration' => [
+                'merchant' => ['capabilities' => ['card_payments' => ['requested' => true]]],
+            ],
         ])->id;
     }
 
@@ -41,7 +43,9 @@ class StripeClientGateway implements StripeGateway
 
     public function chargesEnabled(string $accountId): bool
     {
-        return $this->stripe->accounts->retrieve($accountId)->capabilities?->card_payments === 'active';
+        $account = $this->stripe->v2->core->accounts->retrieve($accountId, ['include' => ['configuration.merchant']]);
+
+        return $account->configuration?->merchant?->capabilities?->card_payments?->status === 'active';
     }
 
     public function checkoutUrl(
