@@ -88,7 +88,7 @@ class Business extends Model
         });
 
         static::created(function (Business $business) {
-            $business->taxRates()->createMany(self::DEFAULT_TAX_RATES);
+            $business->documentTaxRates()->createMany(self::DEFAULT_TAX_RATES);
         });
     }
 
@@ -109,11 +109,14 @@ class Business extends Model
     }
 
     /**
+     * The VAT rates offered on this business's invoices and estimates. Not named taxRates()
+     * because Cashier's Billable uses that name for subscription tax rates.
+     *
      * Tax rates are read through the relation here, so the current-business scope is bypassed.
      *
      * @return HasMany<TaxRate, $this>
      */
-    public function taxRates(): HasMany
+    public function documentTaxRates(): HasMany
     {
         return $this->hasMany(TaxRate::class)->withoutGlobalScopes();
     }

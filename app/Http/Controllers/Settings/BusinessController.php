@@ -21,7 +21,7 @@ class BusinessController extends Controller
 
         return Inertia::render('settings/business', [
             'business' => $business,
-            'taxRates' => $business->taxRates()->orderByDesc('rate')->get(['id', 'name', 'rate', 'is_default']),
+            'taxRates' => $business->documentTaxRates()->orderByDesc('rate')->get(['id', 'name', 'rate', 'is_default']),
             'canUpdate' => $request->user()->can('update', $business),
         ]);
     }

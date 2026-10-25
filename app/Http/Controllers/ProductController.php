@@ -70,6 +70,6 @@ class ProductController extends Controller
      */
     private function taxRates(Request $request)
     {
-        return $request->user()->currentBusiness->taxRates()->orderByDesc('rate')->get(['id', 'name', 'rate', 'is_default']);
+        return $request->user()->currentBusiness->documentTaxRates()->orderByDesc('rate')->get(['id', 'name', 'rate', 'is_default']);
     }
 }
