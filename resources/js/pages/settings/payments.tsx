@@ -7,7 +7,7 @@ import { Head, router } from '@inertiajs/react';
 import { loadConnectAndInitialize, type StripeConnectInstance } from '@stripe/connect-js';
 import { ConnectAccountOnboarding, ConnectComponentsProvider, ConnectNotificationBanner } from '@stripe/react-connect-js';
 import { CheckCircle2, CircleAlert, ExternalLink } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -66,8 +66,9 @@ function initializeConnect(publishableKey: string): StripeConnectInstance {
 }
 
 export default function Payments({ stripe, canUpdate }: PaymentsProps) {
-    const embedded = stripe.connected && canUpdate && stripe.publishable_key !== null;
-    const [connectInstance] = useState(() => (embedded ? initializeConnect(stripe.publishable_key!) : null));
+    const publishableKey = stripe.connected && canUpdate ? stripe.publishable_key : null;
+    // Recomputed when the props change, since connecting reloads this page without remounting it.
+    const connectInstance = useMemo(() => (publishableKey ? initializeConnect(publishableKey) : null), [publishableKey]);
 
     const connect = () => router.post(route('payments.connect'));
     const sync = () => router.post(route('payments.sync'), {}, { preserveScroll: true });
