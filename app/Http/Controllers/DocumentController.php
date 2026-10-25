@@ -244,7 +244,7 @@ class DocumentController extends Controller
                 'unit_price' => number_format($product->unit_price / 100, 2, '.', ''),
                 'tax_rate' => $product->taxRate?->rate,
             ]),
-            'taxRates' => $business->taxRates()->orderByDesc('rate')->get(['id', 'name', 'rate', 'is_default']),
+            'taxRates' => $business->documentTaxRates()->orderByDesc('rate')->get(['id', 'name', 'rate', 'is_default']),
         ];
     }
 

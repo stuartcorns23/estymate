@@ -59,7 +59,7 @@ class DocumentRequest extends FormRequest
             'items.*.unit_price' => ['required', 'numeric', 'min:0', 'max:10000000', 'decimal:0,2'],
             'items.*.tax_rate' => [
                 'required',
-                Rule::in($business->taxRates()->pluck('rate')->map(fn ($rate) => (string) $rate)->all()),
+                Rule::in($business->documentTaxRates()->pluck('rate')->map(fn ($rate) => (string) $rate)->all()),
             ],
         ];
     }

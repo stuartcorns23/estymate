@@ -45,6 +45,12 @@ class SubscriptionTest extends TestCase
         ]);
     }
 
+    public function test_cashier_sees_no_subscription_tax_rates()
+    {
+        // Cashier calls taxRates() when building a subscription checkout; it must stay Cashier's.
+        $this->assertSame([], $this->business->taxRates());
+    }
+
     public function test_new_businesses_start_on_a_pro_trial()
     {
         $this->assertSame('pro', $this->business->plan()->key);

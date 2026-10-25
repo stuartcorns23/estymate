@@ -22,7 +22,7 @@ class ProductTest extends TestCase
     public function test_products_store_prices_in_pence()
     {
         $user = User::factory()->withBusiness()->create();
-        $rate = $user->currentBusiness->taxRates()->where('is_default', true)->first();
+        $rate = $user->currentBusiness->documentTaxRates()->where('is_default', true)->first();
 
         $this->actingAs($user)
             ->post('/products', ['name' => 'Consulting', 'unit_price' => '75.50', 'unit' => 'hour', 'tax_rate_id' => $rate->id])
@@ -37,7 +37,7 @@ class ProductTest extends TestCase
     public function test_products_cannot_use_another_business_tax_rate()
     {
         $other = User::factory()->withBusiness()->create();
-        $foreignRate = $other->currentBusiness->taxRates()->first();
+        $foreignRate = $other->currentBusiness->documentTaxRates()->first();
 
         $this->actingAs(User::factory()->withBusiness()->create())
             ->post('/products', ['name' => 'Consulting', 'unit_price' => '10', 'tax_rate_id' => $foreignRate->id])

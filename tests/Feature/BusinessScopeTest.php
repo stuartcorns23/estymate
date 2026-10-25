@@ -20,7 +20,7 @@ class BusinessScopeTest extends TestCase
 
         $this->assertCount(3, TaxRate::all());
         $this->assertTrue(TaxRate::all()->every(fn (TaxRate $rate) => $rate->business_id === $user->current_business_id));
-        $this->assertNull(TaxRate::find($otherUser->currentBusiness->taxRates()->first()->id));
+        $this->assertNull(TaxRate::find($otherUser->currentBusiness->documentTaxRates()->first()->id));
     }
 
     public function test_new_records_belong_to_the_current_business()

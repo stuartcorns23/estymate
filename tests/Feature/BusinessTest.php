@@ -39,9 +39,9 @@ class BusinessTest extends TestCase
         $this->assertSame(BusinessRole::Owner, $user->roleIn($business));
         $this->assertEqualsCanonicalizing(
             ['20.00', '5.00', '0.00'],
-            $business->taxRates()->pluck('rate')->all(),
+            $business->documentTaxRates()->pluck('rate')->all(),
         );
-        $this->assertSame('20.00', $business->taxRates()->where('is_default', true)->value('rate'));
+        $this->assertSame('20.00', $business->documentTaxRates()->where('is_default', true)->value('rate'));
     }
 
     public function test_invalid_vat_numbers_are_rejected()
