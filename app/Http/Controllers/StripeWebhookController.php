@@ -28,6 +28,7 @@ class StripeWebhookController extends Controller
         match ($event['type'] ?? null) {
             'checkout.session.completed', 'checkout.session.async_payment_succeeded' => $this->recordPayment($event),
             'account.updated' => $this->updateAccount($event),
+            'account.application.deauthorized' => $this->disconnectAccount($event),
             default => null,
         };
 
@@ -85,6 +86,21 @@ class StripeWebhookController extends Controller
         $account = $event['data']['object'];
 
         Business::where('stripe_account_id', $account['id'] ?? null)
-            ->update(['stripe_charges_enabled' => (bool) ($account['charges_enabled'] ?? false)]);
+            ->update(['stripe_charges_enabled' => ($account['capabilities']['card_payments'] ?? null) === 'active']);
+    }
+
+    /**
+     * The business removed Estymate from their Stripe account, so we can no longer charge on it.
+     *
+     * @param  array<string, mixed>  $event
+     */
+    private function disconnectAccount(array $event): void
+    {
+        if (! isset($event['account'])) {
+            return;
+        }
+
+        Business::where('stripe_account_id', $event['account'])
+            ->update(['stripe_account_id' => null, 'stripe_charges_enabled' => false]);
     }
 }

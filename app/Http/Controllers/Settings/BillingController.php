@@ -53,10 +53,19 @@ class BillingController extends Controller
             return $this->portal($request);
         }
 
-        $checkout = $business->newSubscription('default', $plan->stripePrice)->checkout([
+        $subscription = $business->newSubscription('default', $plan->stripePrice)->allowPromotionCodes();
+        $options = [
             'success_url' => route('billing.edit').'?subscribed=1',
             'cancel_url' => route('billing.edit'),
-        ]);
+        ];
+
+        // Stripe Tax needs the customer's address to work out VAT, and UK businesses can add their VAT number.
+        if (config('plans.stripe_tax')) {
+            $subscription->collectTaxIds();
+            $options['customer_update'] = ['address' => 'auto'];
+        }
+
+        $checkout = $subscription->checkout($options);
 
         return Inertia::location($checkout->url);
     }

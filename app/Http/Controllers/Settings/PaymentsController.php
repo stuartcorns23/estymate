@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Services\Stripe\StripeGateway;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class PaymentsController extends Controller
 {
@@ -22,18 +22,22 @@ class PaymentsController extends Controller
 
         return Inertia::render('settings/payments', [
             'stripe' => [
-                'configured' => filled(config('services.stripe.secret')),
+                'configured' => filled(config('services.stripe.secret')) && filled(config('services.stripe.key')),
                 'connected' => $business->stripe_account_id !== null,
                 'charges_enabled' => $business->stripe_charges_enabled,
+                'publishable_key' => config('services.stripe.key'),
+                // Connected accounts have the full Stripe Dashboard for payouts, refunds and disputes.
+                'dashboard_url' => $business->stripe_account_id ? "https://dashboard.stripe.com/{$business->stripe_account_id}" : null,
             ],
             'canUpdate' => $request->user()->can('update', $business),
         ]);
     }
 
     /**
-     * Send the user to Stripe to create or finish setting up their connected account.
+     * Create the business's connected Stripe account. Onboarding then happens on
+     * the payment settings page with Stripe's embedded onboarding component.
      */
-    public function connect(Request $request, StripeGateway $stripe): HttpResponse
+    public function connect(Request $request, StripeGateway $stripe): RedirectResponse
     {
         $business = $request->user()->currentBusiness;
 
@@ -46,17 +50,27 @@ class PaymentsController extends Controller
             ])->save();
         }
 
-        return Inertia::location($stripe->onboardingUrl(
-            $business->stripe_account_id,
-            route('payments.connect.refresh'),
-            route('payments.connect.return'),
-        ));
+        return to_route('payments.edit');
     }
 
     /**
-     * Stripe sends the user here after onboarding; check whether payments are switched on.
+     * A client secret for the embedded onboarding and notification banner components.
      */
-    public function return(Request $request, StripeGateway $stripe): RedirectResponse
+    public function session(Request $request, StripeGateway $stripe): JsonResponse
+    {
+        $business = $request->user()->currentBusiness;
+
+        Gate::authorize('update', $business);
+        abort_unless($business->stripe_account_id, 404);
+
+        return response()->json(['client_secret' => $stripe->accountSessionSecret($business->stripe_account_id)]);
+    }
+
+    /**
+     * Re-check whether the account can take payments, e.g. after leaving onboarding.
+     * The account.updated webhook does the same, but may arrive a little later.
+     */
+    public function sync(Request $request, StripeGateway $stripe): RedirectResponse
     {
         $business = $request->user()->currentBusiness;
 
@@ -65,14 +79,6 @@ class PaymentsController extends Controller
         }
 
         return to_route('payments.edit');
-    }
-
-    /**
-     * Onboarding links expire; Stripe sends the user here to get a fresh one.
-     */
-    public function refresh(Request $request, StripeGateway $stripe): HttpResponse
-    {
-        return $this->connect($request, $stripe);
     }
 
     /**

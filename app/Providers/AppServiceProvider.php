@@ -29,5 +29,10 @@ class AppServiceProvider extends ServiceProvider
     {
         // Businesses, not users, subscribe to Estymate.
         Cashier::useCustomerModel(Business::class);
+
+        // UK VAT on Estymate subscriptions, worked out by Stripe Tax.
+        if (config('plans.stripe_tax')) {
+            Cashier::calculateTaxes();
+        }
     }
 }

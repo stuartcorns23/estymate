@@ -13,27 +13,39 @@ class StripeClientGateway implements StripeGateway
 
     public function createAccount(string $email, string $businessName): string
     {
-        return $this->stripe->accounts->create([
-            'type' => 'standard',
-            'country' => 'GB',
-            'email' => $email,
-            'business_profile' => ['name' => $businessName],
+        // Accounts v2 with the merchant configuration: the business pays Stripe's fees,
+        // Stripe carries loss liability and they get the full Stripe Dashboard.
+        return $this->stripe->v2->core->accounts->create([
+            'contact_email' => $email,
+            'display_name' => $businessName,
+            'dashboard' => 'full',
+            'identity' => ['country' => 'GB'],
+            'defaults' => [
+                'currency' => 'gbp',
+                'responsibilities' => ['fees_collector' => 'stripe', 'losses_collector' => 'stripe'],
+            ],
+            'configuration' => [
+                'merchant' => ['capabilities' => ['card_payments' => ['requested' => true]]],
+            ],
         ])->id;
     }
 
-    public function onboardingUrl(string $accountId, string $refreshUrl, string $returnUrl): string
+    public function accountSessionSecret(string $accountId): string
     {
-        return $this->stripe->accountLinks->create([
+        return $this->stripe->accountSessions->create([
             'account' => $accountId,
-            'refresh_url' => $refreshUrl,
-            'return_url' => $returnUrl,
-            'type' => 'account_onboarding',
-        ])->url;
+            'components' => [
+                'account_onboarding' => ['enabled' => true],
+                'notification_banner' => ['enabled' => true],
+            ],
+        ])->client_secret;
     }
 
     public function chargesEnabled(string $accountId): bool
     {
-        return (bool) $this->stripe->accounts->retrieve($accountId)->charges_enabled;
+        $account = $this->stripe->v2->core->accounts->retrieve($accountId, ['include' => ['configuration.merchant']]);
+
+        return $account->configuration?->merchant?->capabilities?->card_payments?->status === 'active';
     }
 
     public function checkoutUrl(

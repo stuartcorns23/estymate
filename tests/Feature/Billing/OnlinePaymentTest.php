@@ -26,7 +26,7 @@ class OnlinePaymentTest extends TestCase
     {
         parent::setUp();
 
-        config(['services.stripe.secret' => 'sk_test_fake']);
+        config(['services.stripe.secret' => 'sk_test_fake', 'services.stripe.key' => 'pk_test_fake']);
         $this->stripe = new FakeStripeGateway;
         $this->app->instance(StripeGateway::class, $this->stripe);
 
@@ -81,18 +81,30 @@ class OnlinePaymentTest extends TestCase
     {
         $this->get('/settings/payments')->assertOk();
 
-        $this->post('/settings/payments/connect')->assertRedirect('https://connect.stripe.test/onboarding/acct_test123');
+        $this->post('/settings/payments/connect')->assertRedirect('/settings/payments');
         $this->assertSame('acct_test123', $this->user->currentBusiness->fresh()->stripe_account_id);
 
-        $this->get('/settings/payments/connect/return')->assertRedirect('/settings/payments');
+        $this->postJson('/settings/payments/session')->assertOk()->assertJson(['client_secret' => 'accs_secret_acct_test123']);
+
+        $this->post('/settings/payments/sync')->assertRedirect('/settings/payments');
         $this->assertTrue($this->user->currentBusiness->fresh()->stripe_charges_enabled);
+
+        $this->get('/settings/payments')->assertInertia(fn ($page) => $page
+            ->where('stripe.dashboard_url', 'https://dashboard.stripe.com/acct_test123'));
+    }
+
+    public function test_no_onboarding_session_before_connecting()
+    {
+        $this->postJson('/settings/payments/session')->assertNotFound();
     }
 
     public function test_members_cannot_connect_stripe()
     {
-        $this->actingAs(User::factory()->withBusiness(BusinessRole::Member)->create())
-            ->post('/settings/payments/connect')
-            ->assertForbidden();
+        $member = User::factory()->withBusiness(BusinessRole::Member)->create();
+        $member->currentBusiness->forceFill(['stripe_account_id' => 'acct_member'])->save();
+
+        $this->actingAs($member)->post('/settings/payments/connect')->assertForbidden();
+        $this->actingAs($member)->postJson('/settings/payments/session')->assertForbidden();
     }
 
     public function test_clients_can_view_a_document_by_its_link_without_logging_in()
@@ -174,10 +186,32 @@ class OnlinePaymentTest extends TestCase
 
         $this->call('POST', '/stripe/webhook', server: ['HTTP_STRIPE_SIGNATURE' => 'valid'], content: json_encode([
             'type' => 'account.updated',
-            'data' => ['object' => ['id' => 'acct_test123', 'charges_enabled' => false]],
+            'data' => ['object' => ['id' => 'acct_test123', 'capabilities' => ['card_payments' => 'inactive']]],
         ]))->assertOk();
 
         $this->assertFalse($this->user->currentBusiness->fresh()->stripe_charges_enabled);
+
+        $this->call('POST', '/stripe/webhook', server: ['HTTP_STRIPE_SIGNATURE' => 'valid'], content: json_encode([
+            'type' => 'account.updated',
+            'data' => ['object' => ['id' => 'acct_test123', 'capabilities' => ['card_payments' => 'active']]],
+        ]))->assertOk();
+
+        $this->assertTrue($this->user->currentBusiness->fresh()->stripe_charges_enabled);
+    }
+
+    public function test_businesses_that_remove_estymate_from_stripe_are_disconnected()
+    {
+        $this->connectStripe();
+
+        $this->call('POST', '/stripe/webhook', server: ['HTTP_STRIPE_SIGNATURE' => 'valid'], content: json_encode([
+            'type' => 'account.application.deauthorized',
+            'account' => 'acct_test123',
+            'data' => ['object' => ['id' => 'ca_platform']],
+        ]))->assertOk();
+
+        $business = $this->user->currentBusiness->fresh();
+        $this->assertNull($business->stripe_account_id);
+        $this->assertFalse($business->stripe_charges_enabled);
     }
 
     public function test_emails_include_the_client_link()
