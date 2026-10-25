@@ -18,6 +18,10 @@ return [
     // Plan for businesses with no subscription and no trial.
     'default' => 'free',
 
+    // Charge UK VAT on subscriptions with Stripe Tax. Turn on once Stripe Tax is
+    // set up with your VAT registration, and the Stripe Prices' tax behaviour is set.
+    'stripe_tax' => (bool) env('STRIPE_TAX', false),
+
     'plans' => [
         'free' => [
             'name' => 'Free',

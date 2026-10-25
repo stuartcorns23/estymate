@@ -13,27 +13,35 @@ class StripeClientGateway implements StripeGateway
 
     public function createAccount(string $email, string $businessName): string
     {
+        // Controller properties rather than the legacy type=standard: the business pays
+        // Stripe's fees, Stripe carries loss liability and they get the full Dashboard.
         return $this->stripe->accounts->create([
-            'type' => 'standard',
+            'controller' => [
+                'fees' => ['payer' => 'account'],
+                'losses' => ['payments' => 'stripe'],
+                'stripe_dashboard' => ['type' => 'full'],
+            ],
+            'capabilities' => ['card_payments' => ['requested' => true]],
             'country' => 'GB',
             'email' => $email,
             'business_profile' => ['name' => $businessName],
         ])->id;
     }
 
-    public function onboardingUrl(string $accountId, string $refreshUrl, string $returnUrl): string
+    public function accountSessionSecret(string $accountId): string
     {
-        return $this->stripe->accountLinks->create([
+        return $this->stripe->accountSessions->create([
             'account' => $accountId,
-            'refresh_url' => $refreshUrl,
-            'return_url' => $returnUrl,
-            'type' => 'account_onboarding',
-        ])->url;
+            'components' => [
+                'account_onboarding' => ['enabled' => true],
+                'notification_banner' => ['enabled' => true],
+            ],
+        ])->client_secret;
     }
 
     public function chargesEnabled(string $accountId): bool
     {
-        return (bool) $this->stripe->accounts->retrieve($accountId)->charges_enabled;
+        return $this->stripe->accounts->retrieve($accountId)->capabilities?->card_payments === 'active';
     }
 
     public function checkoutUrl(

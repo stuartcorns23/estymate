@@ -17,9 +17,9 @@ class FakeStripeGateway implements StripeGateway
         return 'acct_test123';
     }
 
-    public function onboardingUrl(string $accountId, string $refreshUrl, string $returnUrl): string
+    public function accountSessionSecret(string $accountId): string
     {
-        return "https://connect.stripe.test/onboarding/{$accountId}";
+        return "accs_secret_{$accountId}";
     }
 
     public function chargesEnabled(string $accountId): bool

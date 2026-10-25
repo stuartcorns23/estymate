@@ -13,12 +13,13 @@ interface StripeGateway
     public function createAccount(string $email, string $businessName): string;
 
     /**
-     * A one-time onboarding URL for the connected account.
+     * A short-lived client secret for Stripe's embedded Connect components
+     * (onboarding and the notification banner) for the connected account.
      */
-    public function onboardingUrl(string $accountId, string $refreshUrl, string $returnUrl): string;
+    public function accountSessionSecret(string $accountId): string;
 
     /**
-     * Whether the connected account can take card payments yet.
+     * Whether the connected account's card_payments capability is active.
      */
     public function chargesEnabled(string $accountId): bool;
 

@@ -34,8 +34,8 @@ Route::middleware(['auth', 'business'])->group(function () {
 
     Route::get('settings/payments', [PaymentsController::class, 'edit'])->name('payments.edit');
     Route::post('settings/payments/connect', [PaymentsController::class, 'connect'])->name('payments.connect');
-    Route::get('settings/payments/connect/return', [PaymentsController::class, 'return'])->name('payments.connect.return');
-    Route::get('settings/payments/connect/refresh', [PaymentsController::class, 'refresh'])->name('payments.connect.refresh');
+    Route::post('settings/payments/session', [PaymentsController::class, 'session'])->name('payments.session');
+    Route::post('settings/payments/sync', [PaymentsController::class, 'sync'])->name('payments.sync');
     Route::delete('settings/payments/connect', [PaymentsController::class, 'disconnect'])->name('payments.disconnect');
 
     Route::get('settings/team', [TeamController::class, 'edit'])->name('team.edit');
