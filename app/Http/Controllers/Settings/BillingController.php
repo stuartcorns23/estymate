@@ -19,6 +19,7 @@ class BillingController extends Controller
     {
         $business = $request->user()->currentBusiness;
         $subscription = $business->subscription();
+        $yearly = $subscription && $subscription->stripe_price === Plan::forStripePrice($subscription->stripe_price)?->stripeYearlyPrice;
 
         return Inertia::render('settings/billing', [
             'plan' => $business->plan()->toArray(),
@@ -26,6 +27,7 @@ class BillingController extends Controller
             'plans' => array_map(fn (Plan $plan) => $plan->toArray(), Plan::all()),
             'subscription' => $subscription ? [
                 'status' => $subscription->stripe_status,
+                'interval' => $yearly ? 'year' : 'month',
                 'on_grace_period' => $subscription->onGracePeriod(),
                 'ends_at' => $subscription->ends_at?->toDateString(),
             ] : null,
@@ -45,15 +47,17 @@ class BillingController extends Controller
 
         Gate::authorize('update', $business);
 
+        $interval = $request->input('interval') === 'year' ? 'year' : 'month';
         $plan = rescue(fn () => Plan::find($plan), report: false);
-        abort_unless($plan?->stripePrice, 404);
+        $price = $plan?->stripePriceFor($interval);
+        abort_unless($price, 404);
 
         // Plan changes for existing subscribers happen in the billing portal, which handles proration.
         if ($business->subscribed()) {
             return $this->portal($request);
         }
 
-        $subscription = $business->newSubscription('default', $plan->stripePrice)->allowPromotionCodes();
+        $subscription = $business->newSubscription('default', $price)->allowPromotionCodes();
         $options = [
             'success_url' => route('billing.edit').'?subscribed=1',
             'cancel_url' => route('billing.edit'),
