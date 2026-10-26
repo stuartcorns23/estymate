@@ -21,7 +21,12 @@ class SubscriptionTest extends TestCase
     {
         parent::setUp();
 
-        config(['plans.plans.starter.stripe_price' => 'price_starter', 'plans.plans.pro.stripe_price' => 'price_pro']);
+        config([
+            'plans.plans.starter.stripe_price' => 'price_starter',
+            'plans.plans.starter.stripe_yearly_price' => 'price_starter_yearly',
+            'plans.plans.pro.stripe_price' => 'price_pro',
+            'plans.plans.pro.stripe_yearly_price' => 'price_pro_yearly',
+        ]);
 
         $this->user = User::factory()->withBusiness()->create();
         $this->business = $this->user->currentBusiness;
@@ -72,6 +77,28 @@ class SubscriptionTest extends TestCase
 
         $this->assertSame('starter', $this->business->fresh()->plan()->key);
         $this->assertFalse($this->business->fresh()->isOnFreeTrial());
+    }
+
+    public function test_yearly_subscriptions_set_the_plan()
+    {
+        $this->endTrial();
+        $this->subscribeTo('price_pro_yearly');
+
+        $this->assertSame('pro', $this->business->fresh()->plan()->key);
+
+        $this->get('/settings/billing')->assertInertia(fn ($page) => $page
+            ->where('plan.key', 'pro')
+            ->where('subscription.interval', 'year')
+            ->where('plans.1.yearly_price', 9000)
+            ->where('plans.1.yearly_purchasable', true));
+    }
+
+    public function test_plans_without_a_yearly_price_cannot_be_bought_yearly()
+    {
+        config(['plans.plans.starter.stripe_yearly_price' => null]);
+        $this->endTrial();
+
+        $this->post('/settings/billing/checkout/starter', ['interval' => 'year'])->assertNotFound();
     }
 
     public function test_ended_subscriptions_fall_back_to_free()

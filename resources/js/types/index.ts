@@ -11,8 +11,10 @@ export interface PlanInfo {
     key: string;
     name: string;
     price: number;
+    yearly_price: number;
     limits: Record<'clients' | 'invoices_per_month' | 'estimates_per_month' | 'team_members', number | null>;
     purchasable: boolean;
+    yearly_purchasable: boolean;
 }
 
 export interface BusinessSummary {

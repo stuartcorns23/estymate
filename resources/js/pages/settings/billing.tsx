@@ -6,6 +6,7 @@ import { formatDate, formatMoney } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type PlanInfo, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -25,12 +26,14 @@ interface BillingProps {
     plan: PlanInfo;
     usage: Record<keyof PlanInfo['limits'], number>;
     plans: PlanInfo[];
-    subscription: { status: string; on_grace_period: boolean; ends_at: string | null } | null;
+    subscription: { status: string; interval: Interval; on_grace_period: boolean; ends_at: string | null } | null;
     trial_ends_at: string | null;
     comped: boolean;
     stripeConfigured: boolean;
     canManage: boolean;
 }
+
+type Interval = 'month' | 'year';
 
 function limitText(limit: number | null, unit: string) {
     return limit === null ? `Unlimited ${unit}` : `${limit} ${unit}`;
@@ -39,6 +42,8 @@ function limitText(limit: number | null, unit: string) {
 export default function Billing({ plan, usage, plans, subscription, trial_ends_at, comped, stripeConfigured, canManage }: BillingProps) {
     const { flash } = usePage<SharedData & { flash?: { status?: string } }>().props;
     const subscribed = subscription !== null && subscription.status !== 'canceled';
+    const offersYearly = plans.some((option) => option.yearly_purchasable);
+    const [interval, setBillingInterval] = useState<Interval>(subscription?.interval ?? 'month');
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -89,37 +94,72 @@ export default function Billing({ plan, usage, plans, subscription, trial_ends_a
 
                 {canManage && !comped && (
                     <div className="space-y-6">
-                        <HeadingSmall title="Plans" description="Prices exclude VAT. Change or cancel at any time." />
-                        <div className="grid gap-4 sm:grid-cols-3">
-                            {plans.map((option) => (
-                                <div
-                                    key={option.key}
-                                    className={cn('flex flex-col gap-3 rounded-lg border p-4', option.key === plan.key && 'border-primary')}
-                                >
-                                    <div>
-                                        <p className="font-medium">{option.name}</p>
-                                        <p className="text-2xl font-semibold">
-                                            {option.price === 0 ? 'Free' : formatMoney(option.price)}
-                                            {option.price > 0 && <span className="text-muted-foreground text-sm font-normal"> /month</span>}
-                                        </p>
-                                    </div>
-                                    <ul className="text-muted-foreground flex-1 space-y-1 text-sm">
-                                        <li>{limitText(option.limits.clients, 'clients')}</li>
-                                        <li>{limitText(option.limits.invoices_per_month, 'invoices a month')}</li>
-                                        <li>{limitText(option.limits.estimates_per_month, 'estimates a month')}</li>
-                                        <li>{limitText(option.limits.team_members, option.limits.team_members === 1 ? 'user' : 'users')}</li>
-                                    </ul>
-                                    {option.key === plan.key && !trial_ends_at ? (
-                                        <Button variant="secondary" disabled>
-                                            Current plan
-                                        </Button>
-                                    ) : option.purchasable && stripeConfigured ? (
-                                        <Button onClick={() => router.post(route('billing.checkout', option.key))}>
-                                            {subscribed ? 'Switch' : 'Choose'} {option.name}
-                                        </Button>
-                                    ) : null}
+                        <div className="flex flex-wrap items-end justify-between gap-4">
+                            <HeadingSmall title="Plans" description="Prices exclude VAT. Change or cancel at any time." />
+                            {offersYearly && (
+                                <div className="inline-flex gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
+                                    {(['month', 'year'] as const).map((value) => (
+                                        <button
+                                            key={value}
+                                            onClick={() => setBillingInterval(value)}
+                                            className={cn(
+                                                'rounded-md px-3.5 py-1.5 text-sm transition-colors',
+                                                interval === value
+                                                    ? 'bg-white shadow-xs dark:bg-neutral-700 dark:text-neutral-100'
+                                                    : 'text-neutral-500 hover:bg-neutral-200/60 hover:text-black dark:text-neutral-400 dark:hover:bg-neutral-700/60',
+                                            )}
+                                        >
+                                            {value === 'month' ? 'Monthly' : 'Yearly'}
+                                        </button>
+                                    ))}
                                 </div>
-                            ))}
+                            )}
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-3">
+                            {plans.map((option) => {
+                                const yearly = interval === 'year' && option.yearly_purchasable;
+                                const price = yearly ? option.yearly_price : option.price;
+                                const saving = option.price * 12 - option.yearly_price;
+
+                                return (
+                                    <div
+                                        key={option.key}
+                                        className={cn('flex flex-col gap-3 rounded-lg border p-4', option.key === plan.key && 'border-primary')}
+                                    >
+                                        <div>
+                                            <p className="font-medium">{option.name}</p>
+                                            <p className="text-2xl font-semibold">
+                                                {price === 0 ? 'Free' : formatMoney(price)}
+                                                {price > 0 && (
+                                                    <span className="text-muted-foreground text-sm font-normal"> /{yearly ? 'year' : 'month'}</span>
+                                                )}
+                                            </p>
+                                            {yearly && saving > 0 && (
+                                                <p className="text-xs text-green-700 dark:text-green-400">Save {formatMoney(saving)} a year</p>
+                                            )}
+                                        </div>
+                                        <ul className="text-muted-foreground flex-1 space-y-1 text-sm">
+                                            <li>{limitText(option.limits.clients, 'clients')}</li>
+                                            <li>{limitText(option.limits.invoices_per_month, 'invoices a month')}</li>
+                                            <li>{limitText(option.limits.estimates_per_month, 'estimates a month')}</li>
+                                            <li>{limitText(option.limits.team_members, option.limits.team_members === 1 ? 'user' : 'users')}</li>
+                                        </ul>
+                                        {option.key === plan.key && !trial_ends_at ? (
+                                            <Button variant="secondary" disabled>
+                                                Current plan
+                                            </Button>
+                                        ) : option.purchasable && stripeConfigured ? (
+                                            <Button
+                                                onClick={() =>
+                                                    router.post(route('billing.checkout', option.key), { interval: yearly ? 'year' : 'month' })
+                                                }
+                                            >
+                                                {subscribed ? 'Switch' : 'Choose'} {option.name}
+                                            </Button>
+                                        ) : null}
+                                    </div>
+                                );
+                            })}
                         </div>
                         {!stripeConfigured && (
                             <p className="text-muted-foreground text-xs">

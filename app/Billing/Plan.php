@@ -18,6 +18,8 @@ final class Plan
         public readonly int $price,
         public readonly ?string $stripePrice,
         public readonly array $limits,
+        public readonly int $yearlyPrice = 0,
+        public readonly ?string $stripeYearlyPrice = null,
     ) {}
 
     public static function find(string $key): self
@@ -28,7 +30,15 @@ final class Plan
             throw new InvalidArgumentException("Unknown plan [{$key}].");
         }
 
-        return new self($key, $plan['name'], $plan['price'], $plan['stripe_price'], $plan['limits']);
+        return new self(
+            $key,
+            $plan['name'],
+            $plan['price'],
+            $plan['stripe_price'],
+            $plan['limits'],
+            $plan['yearly_price'] ?? 0,
+            $plan['stripe_yearly_price'] ?? null,
+        );
     }
 
     /**
@@ -42,12 +52,20 @@ final class Plan
     public static function forStripePrice(?string $priceId): ?self
     {
         foreach (self::all() as $plan) {
-            if ($priceId !== null && $plan->stripePrice === $priceId) {
+            if ($priceId !== null && in_array($priceId, [$plan->stripePrice, $plan->stripeYearlyPrice], true)) {
                 return $plan;
             }
         }
 
         return null;
+    }
+
+    /**
+     * The Stripe Price id for billing monthly ('month') or yearly ('year').
+     */
+    public function stripePriceFor(string $interval): ?string
+    {
+        return $interval === 'year' ? $this->stripeYearlyPrice : $this->stripePrice;
     }
 
     /**
@@ -67,8 +85,10 @@ final class Plan
             'key' => $this->key,
             'name' => $this->name,
             'price' => $this->price,
+            'yearly_price' => $this->yearlyPrice,
             'limits' => $this->limits,
             'purchasable' => $this->stripePrice !== null,
+            'yearly_purchasable' => $this->stripeYearlyPrice !== null,
         ];
     }
 }
