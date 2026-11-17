@@ -29,6 +29,7 @@ class Client extends Model
         'city',
         'county',
         'postcode',
+        'country',
         'vat_number',
         'notes',
     ];

@@ -4,6 +4,7 @@ use App\Billing\Plan;
 use App\Enums\DocumentType;
 use App\Http\Controllers\BusinessController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\ClientImportController;
 use App\Http\Controllers\CurrentBusinessController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentActionController;
@@ -40,6 +41,9 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth', 'business'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
+    Route::get('clients/import', [ClientImportController::class, 'create'])->name('clients.import');
+    Route::post('clients/import/preview', [ClientImportController::class, 'preview'])->name('clients.import.preview');
+    Route::post('clients/import', [ClientImportController::class, 'store'])->name('clients.import.store');
     Route::resource('clients', ClientController::class)->except('show');
     Route::resource('products', ProductController::class)->except('show');
     Route::resource('expenses', ExpenseController::class)->except('show');

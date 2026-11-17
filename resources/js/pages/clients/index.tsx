@@ -3,13 +3,15 @@ import Pagination from '@/components/pagination';
 import SearchInput from '@/components/search-input';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem, type Client, type Paginated } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { type BreadcrumbItem, type Client, type Paginated, type SharedData } from '@/types';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { FileUp, Plus } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Clients', href: '/clients' }];
 
 export default function ClientsIndex({ clients, filters }: { clients: Paginated<Client>; filters: { search: string } }) {
+    const { flash } = usePage<SharedData & { flash?: { status?: string } }>().props;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Clients" />
@@ -19,13 +21,26 @@ export default function ClientsIndex({ clients, filters }: { clients: Paginated<
                     title="Clients"
                     description="The people and businesses you send estimates and invoices to"
                     actions={
-                        <Button asChild>
-                            <Link href={route('clients.create')}>
-                                <Plus /> Add client
-                            </Link>
-                        </Button>
+                        <>
+                            <Button variant="outline" asChild>
+                                <Link href={route('clients.import')}>
+                                    <FileUp /> Import
+                                </Link>
+                            </Button>
+                            <Button asChild>
+                                <Link href={route('clients.create')}>
+                                    <Plus /> Add client
+                                </Link>
+                            </Button>
+                        </>
                     }
                 />
+
+                {flash?.status && (
+                    <p className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900 dark:border-green-900 dark:bg-green-950 dark:text-green-100">
+                        {flash.status}
+                    </p>
+                )}
 
                 <SearchInput value={filters.search} placeholder="Search clients" />
 
@@ -33,7 +48,7 @@ export default function ClientsIndex({ clients, filters }: { clients: Paginated<
                     <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
                         {filters.search
                             ? 'No clients match your search.'
-                            : 'No clients yet. Add your first client to start sending estimates and invoices.'}
+                            : 'No clients yet. Add your first client, or import them from a CSV, to start sending estimates and invoices.'}
                     </div>
                 ) : (
                     <div className="overflow-x-auto rounded-lg border">
