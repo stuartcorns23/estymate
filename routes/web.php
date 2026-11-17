@@ -46,6 +46,7 @@ Route::middleware(['auth', 'business'])->group(function () {
     Route::post('clients/import', [ClientImportController::class, 'store'])->name('clients.import.store');
     Route::resource('clients', ClientController::class)->except('show');
     Route::resource('products', ProductController::class)->except('show');
+    Route::post('expenses/scan', [ExpenseController::class, 'scan'])->middleware('throttle:20,1')->name('expenses.scan');
     Route::resource('expenses', ExpenseController::class)->except('show');
     Route::get('expenses/{expense}/attachment', [ExpenseController::class, 'attachment'])->name('expenses.attachment');
     Route::resource('recurring-invoices', RecurringInvoiceController::class)->only(['index', 'update', 'destroy']);

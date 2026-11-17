@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\Business;
+use App\Services\ExpenseReader\ClaudeExpenseReader;
+use App\Services\ExpenseReader\ExpenseReader;
 use App\Services\Stripe\StripeClientGateway;
 use App\Services\Stripe\StripeGateway;
 use Illuminate\Support\ServiceProvider;
@@ -19,6 +21,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(StripeGateway::class, fn () => new StripeClientGateway(
             new StripeClient((string) config('services.stripe.secret')),
             config('services.stripe.connect_webhook_secret'),
+        ));
+
+        $this->app->bind(ExpenseReader::class, fn () => new ClaudeExpenseReader(
+            config('services.anthropic.key'),
+            (string) config('services.anthropic.model'),
         ));
     }
 
