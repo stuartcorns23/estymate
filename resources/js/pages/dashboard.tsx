@@ -71,8 +71,9 @@ function List({ title, rows, empty, routeName, dateLabel }: { title: string; row
 }
 
 // Two series: money in and money out. Text stays in the text colours; only the marks carry these.
-const incomeColor = 'bg-[#2a78d6] dark:bg-[#3987e5]';
-const expenseColor = 'bg-[#eb6834] dark:bg-[#d95926]';
+// Brand chart steps from app.css (electric blue / turquoise), each with its own light and dark value.
+const incomeColor = 'bg-chart-1';
+const expenseColor = 'bg-chart-2';
 
 function monthLabel(month: string, withYear = false): string {
     return new Date(`${month}-01T00:00:00`).toLocaleDateString('en-GB', withYear ? { month: 'long', year: 'numeric' } : { month: 'short' });

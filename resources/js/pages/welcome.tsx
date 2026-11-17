@@ -17,7 +17,7 @@ export default function Welcome({ plans, trialDays }: { plans: PlanInfo[]; trial
             <div className="bg-background text-foreground flex min-h-screen flex-col">
                 <header className="mx-auto flex w-full max-w-5xl items-center justify-between p-6">
                     <div className="flex items-center gap-2 font-semibold">
-                        <AppLogoIcon className="size-6 fill-current" />
+                        <AppLogoIcon className="size-6" />
                         Estymate
                     </div>
                     <nav className="flex items-center gap-2">
