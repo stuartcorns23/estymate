@@ -9,6 +9,7 @@
 | prices live on the Stripe Prices whose ids are set in .env. A plan can
 | have a monthly and a yearly Stripe Price on the same Stripe Product.
 | assistant_messages_per_month counts questions asked of the in-app assistant.
+| Features are switched on per plan; tax_return is the tax year report.
 */
 
 return [
@@ -38,6 +39,9 @@ return [
                 'team_members' => 1,
                 'assistant_messages_per_month' => 20,
             ],
+            'features' => [
+                'tax_return' => false,
+            ],
         ],
 
         'starter' => [
@@ -53,6 +57,9 @@ return [
                 'team_members' => 2,
                 'assistant_messages_per_month' => 200,
             ],
+            'features' => [
+                'tax_return' => false,
+            ],
         ],
 
         'pro' => [
@@ -67,6 +74,9 @@ return [
                 'estimates_per_month' => null,
                 'team_members' => 10,
                 'assistant_messages_per_month' => null,
+            ],
+            'features' => [
+                'tax_return' => true,
             ],
         ],
     ],

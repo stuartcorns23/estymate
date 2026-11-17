@@ -11,6 +11,7 @@ final class Plan
 {
     /**
      * @param  array<string, int|null>  $limits
+     * @param  array<string, bool>  $features
      */
     public function __construct(
         public readonly string $key,
@@ -20,6 +21,7 @@ final class Plan
         public readonly array $limits,
         public readonly int $yearlyPrice = 0,
         public readonly ?string $stripeYearlyPrice = null,
+        public readonly array $features = [],
     ) {}
 
     public static function find(string $key): self
@@ -38,6 +40,7 @@ final class Plan
             $plan['limits'],
             $plan['yearly_price'] ?? 0,
             $plan['stripe_yearly_price'] ?? null,
+            $plan['features'] ?? [],
         );
     }
 
@@ -77,6 +80,28 @@ final class Plan
     }
 
     /**
+     * Whether the plan includes a feature, like 'tax_return'.
+     */
+    public function hasFeature(string $feature): bool
+    {
+        return (bool) ($this->features[$feature] ?? false);
+    }
+
+    /**
+     * The name of the cheapest plan that includes a feature.
+     */
+    public static function cheapestWith(string $feature): ?self
+    {
+        foreach (self::all() as $plan) {
+            if ($plan->hasFeature($feature)) {
+                return $plan;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(): array
@@ -87,6 +112,7 @@ final class Plan
             'price' => $this->price,
             'yearly_price' => $this->yearlyPrice,
             'limits' => $this->limits,
+            'features' => $this->features,
             'purchasable' => $this->stripePrice !== null,
             'yearly_purchasable' => $this->stripeYearlyPrice !== null,
         ];
