@@ -12,7 +12,7 @@ export interface PlanInfo {
     name: string;
     price: number;
     yearly_price: number;
-    limits: Record<'clients' | 'invoices_per_month' | 'estimates_per_month' | 'team_members', number | null>;
+    limits: Record<'clients' | 'invoices_per_month' | 'estimates_per_month' | 'team_members' | 'assistant_messages_per_month', number | null>;
     purchasable: boolean;
     yearly_purchasable: boolean;
 }
@@ -64,6 +64,7 @@ export interface SharedData {
     name: string;
     quote: { message: string; author: string };
     auth: Auth;
+    features: { assistant: boolean };
     [key: string]: unknown;
 }
 

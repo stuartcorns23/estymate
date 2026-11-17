@@ -20,6 +20,7 @@ const limitLabels: Record<keyof PlanInfo['limits'], string> = {
     invoices_per_month: 'Invoices this month',
     estimates_per_month: 'Estimates this month',
     team_members: 'Team members',
+    assistant_messages_per_month: 'Assistant questions this month',
 };
 
 interface BillingProps {

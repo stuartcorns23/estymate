@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Business;
+use App\Services\Assistant\Assistant;
 use App\Services\ExpenseReader\ClaudeExpenseReader;
 use App\Services\ExpenseReader\ExpenseReader;
 use App\Services\Stripe\StripeClientGateway;
@@ -26,6 +27,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ExpenseReader::class, fn () => new ClaudeExpenseReader(
             config('services.anthropic.key'),
             (string) config('services.anthropic.model'),
+        ));
+
+        $this->app->bind(Assistant::class, fn () => new Assistant(
+            config('services.anthropic.key'),
+            (string) (config('services.anthropic.assistant_model') ?: config('services.anthropic.model')),
         ));
     }
 
