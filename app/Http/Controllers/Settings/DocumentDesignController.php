@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -55,7 +56,13 @@ class DocumentDesignController extends Controller
         $oldLogo = $business->document_logo_path;
 
         if ($request->hasFile('logo')) {
-            $business->document_logo_path = $request->file('logo')->store("logos/{$business->id}", DocumentDesign::DISK);
+            // Write the contents rather than using store(): store() opens the upload by its real
+            // path, which PHP can't resolve for the temp folder on some Windows setups (Laragon),
+            // failing with "Path must not be empty".
+            $logo = $request->file('logo');
+            $path = "logos/{$business->id}/".Str::random(40).'.'.($logo->guessExtension() ?: 'png');
+            Storage::disk(DocumentDesign::DISK)->put($path, $logo->get());
+            $business->document_logo_path = $path;
         } elseif ($request->boolean('remove_logo')) {
             $business->document_logo_path = null;
         }
