@@ -17,6 +17,11 @@ const sidebarNavItems: NavItem[] = [
         icon: null,
     },
     {
+        title: 'Invoice design',
+        url: '/settings/invoice-design',
+        icon: null,
+    },
+    {
         title: 'Billing',
         url: '/settings/billing',
         icon: null,
@@ -43,7 +48,7 @@ const sidebarNavItems: NavItem[] = [
     },
 ];
 
-export default function SettingsLayout({ children }: { children: React.ReactNode }) {
+export default function SettingsLayout({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
     const currentPath = window.location.pathname;
 
     return (
@@ -73,8 +78,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
                 <Separator className="my-6 md:hidden" />
 
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="max-w-xl space-y-12">{children}</section>
+                <div className={cn('min-w-0 flex-1', !wide && 'md:max-w-2xl')}>
+                    <section className={cn('space-y-12', !wide && 'max-w-xl')}>{children}</section>
                 </div>
             </div>
         </div>

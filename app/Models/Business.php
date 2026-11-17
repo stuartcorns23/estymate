@@ -52,6 +52,11 @@ class Business extends Model
         'payment_terms_days',
         'payment_details',
         'send_reminders',
+        'document_layout',
+        'document_colour',
+        'document_accent_colour',
+        'document_font',
+        'document_footer',
     ];
 
     /**
@@ -79,6 +84,7 @@ class Business extends Model
         'pm_type',
         'pm_last_four',
         'plan_override',
+        'document_logo_path',
     ];
 
     protected static function booted(): void

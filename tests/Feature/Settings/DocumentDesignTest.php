@@ -1,0 +1,180 @@
+<?php
+
+namespace Tests\Feature\Settings;
+
+use App\Enums\BusinessRole;
+use App\Enums\DocumentLayout;
+use App\Models\Client;
+use App\Models\Document;
+use App\Models\User;
+use App\Support\DocumentDesign;
+use App\Support\DocumentPdf;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
+use Tests\TestCase;
+
+class DocumentDesignTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function payload(array $overrides = []): array
+    {
+        return [
+            'document_layout' => 'modern',
+            'document_colour' => '#0f766e',
+            'document_accent_colour' => '#B45309',
+            'document_font' => 'serif',
+            'document_footer' => 'Thank you for your business!',
+            ...$overrides,
+        ];
+    }
+
+    public function test_the_design_page_is_displayed()
+    {
+        $user = User::factory()->withBusiness()->create();
+
+        $this->actingAs($user)
+            ->get('/settings/invoice-design')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('settings/invoice-design')
+                ->where('design.document_layout', 'classic')
+                ->where('logoUrl', null)
+                ->has('layouts', 5)
+                ->where('canUpdate', true));
+    }
+
+    public function test_owners_can_save_a_design_with_a_logo()
+    {
+        Storage::fake(DocumentDesign::DISK);
+        $user = User::factory()->withBusiness()->create();
+
+        $this->actingAs($user)
+            ->post('/settings/invoice-design', $this->payload(['logo' => UploadedFile::fake()->image('logo.png', 400, 100)]))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/settings/invoice-design');
+
+        $business = $user->currentBusiness->fresh();
+        $this->assertSame('modern', $business->document_layout);
+        $this->assertSame('#0F766E', $business->document_colour);
+        $this->assertSame('serif', $business->document_font);
+        $this->assertSame('Thank you for your business!', $business->document_footer);
+        Storage::disk(DocumentDesign::DISK)->assertExists($business->document_logo_path);
+
+        $this->get('/settings/invoice-design/logo')->assertOk();
+    }
+
+    public function test_replacing_or_removing_the_logo_deletes_the_old_file()
+    {
+        Storage::fake(DocumentDesign::DISK);
+        $user = User::factory()->withBusiness()->create();
+        $this->actingAs($user);
+
+        $this->post('/settings/invoice-design', $this->payload(['logo' => UploadedFile::fake()->image('one.png')]));
+        $first = $user->currentBusiness->fresh()->document_logo_path;
+
+        $this->post('/settings/invoice-design', $this->payload(['logo' => UploadedFile::fake()->image('two.png')]));
+        $second = $user->currentBusiness->fresh()->document_logo_path;
+        Storage::disk(DocumentDesign::DISK)->assertMissing($first);
+        Storage::disk(DocumentDesign::DISK)->assertExists($second);
+
+        $this->post('/settings/invoice-design', $this->payload(['remove_logo' => true]));
+        $this->assertNull($user->currentBusiness->fresh()->document_logo_path);
+        Storage::disk(DocumentDesign::DISK)->assertMissing($second);
+    }
+
+    public function test_the_design_is_validated()
+    {
+        $user = User::factory()->withBusiness()->create();
+
+        $this->actingAs($user)
+            ->post('/settings/invoice-design', $this->payload([
+                'document_layout' => 'fancy',
+                'document_colour' => 'red',
+                'logo' => UploadedFile::fake()->create('logo.pdf', 10, 'application/pdf'),
+            ]))
+            ->assertSessionHasErrors(['document_layout', 'document_colour', 'logo']);
+    }
+
+    public function test_members_cannot_change_the_design()
+    {
+        $member = User::factory()->withBusiness(BusinessRole::Member)->create();
+
+        $this->actingAs($member)->post('/settings/invoice-design', $this->payload())->assertForbidden();
+        $this->assertSame('classic', $member->currentBusiness->fresh()->document_layout);
+    }
+
+    public function test_the_preview_renders_unsaved_changes()
+    {
+        $user = User::factory()->withBusiness()->create();
+
+        $response = $this->actingAs($user)
+            ->post('/settings/invoice-design/preview', $this->payload(['type' => 'estimate']))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'text/html; charset=UTF-8');
+
+        $response->assertSee('ESTIMATE')->assertSee('#0F766E')->assertSee('Thank you for your business!');
+        $this->assertSame('classic', $user->currentBusiness->fresh()->document_layout);
+    }
+
+    public function test_the_preview_includes_a_newly_chosen_logo()
+    {
+        $user = User::factory()->withBusiness()->create();
+
+        $this->actingAs($user)
+            ->post('/settings/invoice-design/preview', $this->payload(['logo' => UploadedFile::fake()->image('logo.png', 300, 100)]))
+            ->assertOk()
+            ->assertSee('src="data:image/png;base64,', false)
+            ->assertSee('width="168" height="56"', false);
+    }
+
+    public function test_the_preview_can_be_a_pdf()
+    {
+        $user = User::factory()->withBusiness()->create();
+
+        $response = $this->actingAs($user)
+            ->post('/settings/invoice-design/preview', $this->payload(['format' => 'pdf']))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf');
+
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
+    public function test_every_layout_renders_a_real_invoice_as_a_pdf()
+    {
+        Storage::fake(DocumentDesign::DISK);
+        $user = User::factory()->withBusiness()->create();
+        $this->actingAs($user);
+        $business = $user->currentBusiness;
+        $business->forceFill(['document_logo_path' => UploadedFile::fake()->image('logo.png', 200, 80)->store('logos', DocumentDesign::DISK)])->save();
+
+        $this->post('/invoices', [
+            'client_id' => Client::factory()->create()->id,
+            'issue_date' => '2026-11-17',
+            'due_date' => '2026-12-17',
+            'items' => [
+                ['description' => 'Design', 'quantity' => '2.5', 'unit_price' => '100.00', 'tax_rate' => '20.00'],
+                ['description' => 'Book', 'quantity' => '3', 'unit_price' => '9.99', 'tax_rate' => '0.00'],
+            ],
+        ])->assertSessionHasNoErrors();
+        $invoice = Document::latest('id')->first();
+
+        foreach (DocumentLayout::cases() as $layout) {
+            $business->update(['document_layout' => $layout->value]);
+            $invoice->unsetRelation('business');
+
+            $this->assertStringContainsString('data:image/png;base64,', DocumentPdf::html($invoice));
+            $this->assertStringStartsWith('%PDF', DocumentPdf::render($invoice), $layout->value);
+        }
+    }
+
+    public function test_text_on_colours_stays_readable()
+    {
+        $this->assertSame('#FFFFFF', DocumentDesign::textOn('#071B49'));
+        $this->assertSame('#111827', DocumentDesign::textOn('#FDE68A'));
+        $this->assertSame('#1F2937', DocumentDesign::readableOnWhite('#1F2937'));
+        $this->assertNotSame('#FDE68A', DocumentDesign::readableOnWhite('#FDE68A'));
+    }
+}

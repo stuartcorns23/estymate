@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Settings\BillingController;
 use App\Http\Controllers\Settings\BusinessController;
+use App\Http\Controllers\Settings\DocumentDesignController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\PaymentsController;
 use App\Http\Controllers\Settings\ProfileController;
@@ -27,6 +28,11 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'business'])->group(function () {
     Route::get('settings/business', [BusinessController::class, 'edit'])->name('business.edit');
     Route::patch('settings/business', [BusinessController::class, 'update'])->name('business.update');
+
+    Route::get('settings/invoice-design', [DocumentDesignController::class, 'edit'])->name('invoice-design.edit');
+    Route::post('settings/invoice-design', [DocumentDesignController::class, 'update'])->name('invoice-design.update');
+    Route::post('settings/invoice-design/preview', [DocumentDesignController::class, 'preview'])->name('invoice-design.preview');
+    Route::get('settings/invoice-design/logo', [DocumentDesignController::class, 'logo'])->name('invoice-design.logo');
 
     Route::get('settings/billing', [BillingController::class, 'edit'])->name('billing.edit');
     Route::post('settings/billing/checkout/{plan}', [BillingController::class, 'checkout'])->name('billing.checkout');
