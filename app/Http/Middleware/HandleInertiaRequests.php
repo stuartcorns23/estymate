@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Assistant\Assistant;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -44,6 +45,9 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
+            'features' => [
+                'assistant' => fn () => app(Assistant::class)->available(),
+            ],
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
             ],

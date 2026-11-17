@@ -3,9 +3,9 @@ import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { PlanBadge } from '@/components/plan-badge';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
-import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
-import { FileText, LayoutGrid, Package, Receipt, Repeat, Users, Wallet } from 'lucide-react';
+import { type NavItem, type SharedData } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
+import { FileText, LayoutGrid, MessageCircle, Package, Receipt, Repeat, Users, Wallet } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -46,7 +46,16 @@ const mainNavItems: NavItem[] = [
     },
 ];
 
+const assistantNavItem: NavItem = {
+    title: 'Assistant',
+    url: '/assistant',
+    icon: MessageCircle,
+};
+
 export function AppSidebar() {
+    const { features } = usePage<SharedData>().props;
+    const items = features?.assistant ? [mainNavItems[0], assistantNavItem, ...mainNavItems.slice(1)] : mainNavItems;
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -63,7 +72,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={items} />
             </SidebarContent>
 
             <SidebarFooter>

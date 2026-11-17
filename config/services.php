@@ -40,6 +40,8 @@ return [
     'anthropic' => [
         'key' => env('ANTHROPIC_API_KEY'),
         'model' => env('ANTHROPIC_MODEL', 'claude-opus-5-5'),
+        // The in-app assistant uses ANTHROPIC_MODEL unless this is set.
+        'assistant_model' => env('ANTHROPIC_ASSISTANT_MODEL'),
     ],
 
     'stripe' => [

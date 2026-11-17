@@ -20,6 +20,7 @@ const limitLabels: Record<keyof PlanInfo['limits'], string> = {
     invoices_per_month: 'Invoices this month',
     estimates_per_month: 'Estimates this month',
     team_members: 'Team members',
+    assistant_messages_per_month: 'Assistant questions this month',
 };
 
 interface BillingProps {
@@ -142,6 +143,7 @@ export default function Billing({ plan, usage, plans, subscription, trial_ends_a
                                             <li>{limitText(option.limits.clients, 'clients')}</li>
                                             <li>{limitText(option.limits.invoices_per_month, 'invoices a month')}</li>
                                             <li>{limitText(option.limits.estimates_per_month, 'estimates a month')}</li>
+                                            <li>{limitText(option.limits.assistant_messages_per_month, 'assistant questions a month')}</li>
                                             <li>{limitText(option.limits.team_members, option.limits.team_members === 1 ? 'user' : 'users')}</li>
                                         </ul>
                                         {option.key === plan.key && !trial_ends_at ? (

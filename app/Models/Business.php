@@ -247,6 +247,12 @@ class Business extends Model
             'invoices_per_month' => $usage['invoices_this_month'],
             'estimates_per_month' => $usage['estimates_this_month'],
             'team_members' => $this->users()->count() + $this->invitations()->count(),
+            'assistant_messages_per_month' => AssistantMessage::query()
+                ->withoutGlobalScopes()
+                ->where('business_id', $this->id)
+                ->where('role', 'user')
+                ->where('created_at', '>=', now()->startOfMonth())
+                ->count(),
         ];
     }
 

@@ -2,6 +2,7 @@
 
 use App\Billing\Plan;
 use App\Enums\DocumentType;
+use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\BusinessController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientImportController;
@@ -40,6 +41,12 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth', 'business'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+    Route::get('assistant', [AssistantController::class, 'index'])->name('assistant.index');
+    Route::post('assistant/messages', [AssistantController::class, 'store'])->middleware('throttle:20,1')->name('assistant.messages.store');
+    Route::delete('assistant/{conversation}', [AssistantController::class, 'destroy'])->name('assistant.destroy');
+    Route::post('assistant/drafts/{draft}/confirm', [AssistantController::class, 'confirm'])->name('assistant.drafts.confirm');
+    Route::post('assistant/drafts/{draft}/cancel', [AssistantController::class, 'cancel'])->name('assistant.drafts.cancel');
 
     Route::get('clients/import', [ClientImportController::class, 'create'])->name('clients.import');
     Route::post('clients/import/preview', [ClientImportController::class, 'preview'])->name('clients.import.preview');
