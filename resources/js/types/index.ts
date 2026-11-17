@@ -147,3 +147,25 @@ export interface Option {
     value: string;
     label: string;
 }
+
+export interface Option {
+    value: string;
+    label: string;
+}
+
+export interface Expense {
+    id: number;
+    supplier: string;
+    reference: string | null;
+    date: string;
+    category: string;
+    description: string | null;
+    total: number;
+    vat_amount: number;
+    net_amount: number;
+    currency: string;
+    paid_on: string | null;
+    attachment_name: string | null;
+    has_attachment: boolean;
+    notes: string | null;
+}

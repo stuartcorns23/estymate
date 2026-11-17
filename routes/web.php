@@ -8,6 +8,7 @@ use App\Http\Controllers\CurrentBusinessController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentActionController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
@@ -41,6 +42,8 @@ Route::middleware(['auth', 'business'])->group(function () {
 
     Route::resource('clients', ClientController::class)->except('show');
     Route::resource('products', ProductController::class)->except('show');
+    Route::resource('expenses', ExpenseController::class)->except('show');
+    Route::get('expenses/{expense}/attachment', [ExpenseController::class, 'attachment'])->name('expenses.attachment');
     Route::resource('recurring-invoices', RecurringInvoiceController::class)->only(['index', 'update', 'destroy']);
 
     // Estimates and invoices share one controller; the "type" default tells it which.
