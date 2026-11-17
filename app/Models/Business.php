@@ -150,6 +150,14 @@ class Business extends Model
     }
 
     /**
+     * @return HasMany<Expense, $this>
+     */
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(Expense::class)->withoutGlobalScopes();
+    }
+
+    /**
      * Claim the next document number for the type, e.g. "INV-0007".
      *
      * Call inside a transaction so two people saving at once can't get the same number.
