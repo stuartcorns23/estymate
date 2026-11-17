@@ -36,7 +36,7 @@ return [
                 'invoices_per_month' => 5,
                 'estimates_per_month' => 5,
                 'team_members' => 1,
-                'assistant_messages_per_month' => null,
+                'assistant_messages_per_month' => 20,
             ],
         ],
 
@@ -51,7 +51,7 @@ return [
                 'invoices_per_month' => 50,
                 'estimates_per_month' => 50,
                 'team_members' => 2,
-                'assistant_messages_per_month' => null,
+                'assistant_messages_per_month' => 200,
             ],
         ],
 

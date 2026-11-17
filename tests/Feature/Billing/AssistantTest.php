@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Billing;
 
+use App\Billing\Plan;
 use App\Enums\BusinessRole;
 use App\Enums\DocumentStatus;
 use App\Enums\ExpenseCategory;
@@ -254,6 +255,13 @@ class AssistantTest extends TestCase
             ->assertJsonPath('message', "You've used this month's assistant questions on the Pro plan. Upgrade to ask more.");
 
         $this->assertSame(1, $this->user->currentBusiness->planUsage()['assistant_messages_per_month']);
+    }
+
+    public function test_free_and_starter_plans_include_some_questions()
+    {
+        $this->assertSame(20, Plan::find('free')->limit('assistant_messages_per_month'));
+        $this->assertSame(200, Plan::find('starter')->limit('assistant_messages_per_month'));
+        $this->assertNull(Plan::find('pro')->limit('assistant_messages_per_month'));
     }
 
     public function test_refusals_and_failures_are_shown_without_saving_the_exchange()
