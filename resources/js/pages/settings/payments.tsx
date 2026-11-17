@@ -55,9 +55,9 @@ function initializeConnect(publishableKey: string): StripeConnectInstance {
         },
         appearance: {
             variables: {
-                colorPrimary: dark ? '#fafafa' : '#171717',
-                colorBackground: dark ? '#0a0a0a' : '#ffffff',
-                colorText: dark ? '#fafafa' : '#0a0a0a',
+                colorPrimary: dark ? '#10CFC3' : '#0875E8',
+                colorBackground: dark ? '#0B1A3D' : '#FFFFFF',
+                colorText: dark ? '#FFFFFF' : '#071B49',
                 borderRadius: '8px',
                 fontFamily: 'Instrument Sans, ui-sans-serif, system-ui, sans-serif',
             },
