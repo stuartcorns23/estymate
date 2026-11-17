@@ -47,6 +47,7 @@ class HandleInertiaRequests extends Middleware
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'features' => [
                 'assistant' => fn () => app(Assistant::class)->available(),
+                'tax_return' => fn () => (bool) $user?->currentBusiness?->plan()->hasFeature('tax_return'),
             ],
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),

@@ -17,6 +17,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PublicDocumentController;
 use App\Http\Controllers\RecurringInvoiceController;
 use App\Http\Controllers\StripeWebhookController;
+use App\Http\Controllers\TaxReturnController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -56,6 +57,9 @@ Route::middleware(['auth', 'business'])->group(function () {
     Route::post('expenses/scan', [ExpenseController::class, 'scan'])->middleware('throttle:20,1')->name('expenses.scan');
     Route::resource('expenses', ExpenseController::class)->except('show');
     Route::get('expenses/{expense}/attachment', [ExpenseController::class, 'attachment'])->name('expenses.attachment');
+    Route::get('tax-return', [TaxReturnController::class, 'index'])->name('tax-return.index');
+    Route::get('tax-return/csv', [TaxReturnController::class, 'csv'])->name('tax-return.csv');
+    Route::get('tax-return/pdf', [TaxReturnController::class, 'pdf'])->name('tax-return.pdf');
     Route::resource('recurring-invoices', RecurringInvoiceController::class)->only(['index', 'update', 'destroy']);
 
     // Estimates and invoices share one controller; the "type" default tells it which.

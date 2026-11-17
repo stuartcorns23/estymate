@@ -13,6 +13,7 @@ export interface PlanInfo {
     price: number;
     yearly_price: number;
     limits: Record<'clients' | 'invoices_per_month' | 'estimates_per_month' | 'team_members' | 'assistant_messages_per_month', number | null>;
+    features?: Partial<Record<'tax_return', boolean>>;
     purchasable: boolean;
     yearly_purchasable: boolean;
 }
@@ -64,7 +65,7 @@ export interface SharedData {
     name: string;
     quote: { message: string; author: string };
     auth: Auth;
-    features: { assistant: boolean };
+    features: { assistant: boolean; tax_return: boolean };
     [key: string]: unknown;
 }
 
