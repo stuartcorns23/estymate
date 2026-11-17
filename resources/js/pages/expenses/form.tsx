@@ -1,3 +1,4 @@
+import FileDropZone from '@/components/file-drop-zone';
 import InputError from '@/components/input-error';
 import PageHeader from '@/components/page-header';
 import { Button } from '@/components/ui/button';
@@ -9,14 +10,27 @@ import AppLayout from '@/layouts/app-layout';
 import { formatMoney, formatRate, toPence } from '@/lib/money';
 import { type BreadcrumbItem, type Expense, type Option, type TaxRate } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Paperclip } from 'lucide-react';
-import { FormEventHandler, useState } from 'react';
+import { LoaderCircle, Paperclip, Sparkles } from 'lucide-react';
+import { FormEventHandler, useRef, useState } from 'react';
 
 interface ExpenseFormProps {
     expense: Expense | null;
     categories: Option[];
     taxRates: TaxRate[];
     suppliers: string[];
+    canScan: boolean;
+    scanTypes: string[];
+}
+
+type ScannedFields = Partial<Record<'supplier' | 'reference' | 'date' | 'category' | 'description' | 'total' | 'vat_amount', string>>;
+
+/**
+ * Laravel sets the XSRF-TOKEN cookie on every response; send it back on our own fetch calls.
+ */
+function xsrfToken(): string {
+    const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+
+    return match ? decodeURIComponent(match[1]) : '';
 }
 
 const pounds = (pence: number) => (pence / 100).toFixed(2);
@@ -31,7 +45,7 @@ function vatIncluded(total: string, rate: string): string {
     return pounds(Math.round((pence * percent) / (100 + percent)));
 }
 
-export default function ExpenseForm({ expense, categories, taxRates, suppliers }: ExpenseFormProps) {
+export default function ExpenseForm({ expense, categories, taxRates, suppliers, canScan, scanTypes }: ExpenseFormProps) {
     const title = expense ? `Edit expense from ${expense.supplier}` : 'Add expense';
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Expenses', href: '/expenses' },
@@ -56,7 +70,71 @@ export default function ExpenseForm({ expense, categories, taxRates, suppliers }
         remove_attachment: false as boolean,
     });
 
+    // Fields the person has typed in themselves, which reading a document never overwrites.
+    const touched = useRef(new Set<string>());
+    const [scan, setScan] = useState<{ state: 'idle' | 'reading' | 'done' | 'failed'; message?: string }>({ state: 'idle' });
+
+    const edit = <K extends keyof typeof data>(key: K, value: (typeof data)[K]) => {
+        touched.current.add(key);
+        setData(key, value);
+    };
+
+    const readDocument = async (file: File) => {
+        setScan({ state: 'reading' });
+
+        const body = new FormData();
+        body.append('attachment', file);
+
+        try {
+            const response = await fetch(route('expenses.scan'), {
+                method: 'POST',
+                body,
+                headers: { Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const json = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                const message = json.errors?.attachment?.[0] ?? json.message ?? "The document couldn't be read. Please fill in the details yourself.";
+                setScan({ state: 'failed', message: response.status === 429 ? 'Too many documents read at once. Try again in a minute.' : message });
+                return;
+            }
+
+            const fields: ScannedFields = json.fields ?? {};
+            // On a new expense, fill anything the person hasn't typed; when editing, only fill blanks.
+            const fillable = (Object.keys(fields) as (keyof ScannedFields)[]).filter((key) => !touched.current.has(key) && (!expense || !data[key]));
+
+            if (fillable.length === 0) {
+                setScan({ state: 'done', message: 'Nothing new to fill in from the document.' });
+                return;
+            }
+
+            setData((current) => ({ ...current, ...Object.fromEntries(fillable.map((key) => [key, fields[key]])) }));
+
+            if (fillable.includes('total') || fillable.includes('vat_amount')) {
+                setVatRate('custom');
+            }
+
+            setScan({
+                state: 'done',
+                message: `Filled in ${fillable.length} ${fillable.length === 1 ? 'detail' : 'details'} from the document. Check them before saving.`,
+            });
+        } catch {
+            setScan({ state: 'failed', message: "The document couldn't be read. Please fill in the details yourself." });
+        }
+    };
+
+    const chooseFile = (file: File) => {
+        setData((current) => ({ ...current, attachment: file, remove_attachment: false }));
+
+        if (canScan && scanTypes.includes(file.type)) {
+            readDocument(file);
+        } else {
+            setScan({ state: 'idle' });
+        }
+    };
+
     const setTotal = (total: string) => {
+        touched.current.add('total');
         setData((current) => ({ ...current, total, vat_amount: vatRate === 'custom' ? current.vat_amount : vatIncluded(total, vatRate) }));
     };
 
@@ -95,6 +173,45 @@ export default function ExpenseForm({ expense, categories, taxRates, suppliers }
             <form onSubmit={submit} className="max-w-2xl space-y-6 p-4">
                 <PageHeader title={title} />
 
+                <div className="grid gap-2">
+                    <Label htmlFor="attachment">Invoice or receipt</Label>
+                    <FileDropZone id="attachment" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,application/pdf,image/*" onFile={chooseFile}>
+                        {data.attachment ? (
+                            <span className="font-medium">{data.attachment.name}</span>
+                        ) : (
+                            <span>
+                                <span className="font-medium">Drop the invoice or receipt here</span> or click to choose a file
+                            </span>
+                        )}
+                        <span className="text-muted-foreground text-xs">
+                            PDF or photo, up to 10 MB.{canScan && " We'll read it and fill in the details for you."}
+                        </span>
+                    </FileDropZone>
+                    {expense?.has_attachment && !data.remove_attachment && !data.attachment && (
+                        <div className="flex items-center gap-3 text-sm">
+                            <a href={route('expenses.attachment', expense.id)} className="inline-flex items-center gap-1.5 hover:underline">
+                                <Paperclip className="size-4" /> {expense.attachment_name}
+                            </a>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setData('remove_attachment', true)}>
+                                Remove
+                            </Button>
+                        </div>
+                    )}
+                    {scan.state === 'reading' && (
+                        <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                            <LoaderCircle className="size-4 animate-spin" /> Reading the document…
+                        </p>
+                    )}
+                    {scan.state === 'done' && (
+                        <p className="flex items-center gap-2 text-sm">
+                            <Sparkles className="size-4 shrink-0" /> {scan.message}
+                        </p>
+                    )}
+                    {scan.state === 'failed' && <p className="text-destructive text-sm">{scan.message}</p>}
+                    {progress && <progress value={progress.percentage} max="100" className="w-full" />}
+                    <InputError message={errors.attachment} />
+                </div>
+
                 <div className="grid gap-6 sm:grid-cols-2">
                     <div className="grid gap-2">
                         <Label htmlFor="supplier">Supplier</Label>
@@ -104,7 +221,7 @@ export default function ExpenseForm({ expense, categories, taxRates, suppliers }
                             list="suppliers"
                             autoComplete="off"
                             value={data.supplier}
-                            onChange={(e) => setData('supplier', e.target.value)}
+                            onChange={(e) => edit('supplier', e.target.value)}
                             placeholder="Screwfix"
                         />
                         <datalist id="suppliers">
@@ -117,19 +234,19 @@ export default function ExpenseForm({ expense, categories, taxRates, suppliers }
 
                     <div className="grid gap-2">
                         <Label htmlFor="reference">Invoice or receipt number</Label>
-                        <Input id="reference" value={data.reference} onChange={(e) => setData('reference', e.target.value)} />
+                        <Input id="reference" value={data.reference} onChange={(e) => edit('reference', e.target.value)} />
                         <InputError message={errors.reference} />
                     </div>
 
                     <div className="grid gap-2">
                         <Label htmlFor="date">Date</Label>
-                        <Input id="date" type="date" required value={data.date} onChange={(e) => setData('date', e.target.value)} />
+                        <Input id="date" type="date" required value={data.date} onChange={(e) => edit('date', e.target.value)} />
                         <InputError message={errors.date} />
                     </div>
 
                     <div className="grid gap-2">
                         <Label htmlFor="category">Category</Label>
-                        <Select value={data.category} onValueChange={(value) => setData('category', value)}>
+                        <Select value={data.category} onValueChange={(value) => edit('category', value)}>
                             <SelectTrigger id="category">
                                 <SelectValue placeholder="Choose a category" />
                             </SelectTrigger>
@@ -150,7 +267,7 @@ export default function ExpenseForm({ expense, categories, taxRates, suppliers }
                     <Input
                         id="description"
                         value={data.description}
-                        onChange={(e) => setData('description', e.target.value)}
+                        onChange={(e) => edit('description', e.target.value)}
                         placeholder="Timber and fixings"
                     />
                     <InputError message={errors.description} />
@@ -195,7 +312,7 @@ export default function ExpenseForm({ expense, categories, taxRates, suppliers }
                             value={data.vat_amount}
                             onChange={(e) => {
                                 setVatRate('custom');
-                                setData('vat_amount', e.target.value);
+                                edit('vat_amount', e.target.value);
                             }}
                             placeholder="0.00"
                         />
@@ -207,42 +324,19 @@ export default function ExpenseForm({ expense, categories, taxRates, suppliers }
 
                 <div className="grid gap-2 sm:max-w-xs">
                     <Label htmlFor="paid_on">Paid on</Label>
-                    <Input id="paid_on" type="date" value={data.paid_on} onChange={(e) => setData('paid_on', e.target.value)} />
+                    <Input id="paid_on" type="date" value={data.paid_on} onChange={(e) => edit('paid_on', e.target.value)} />
                     <p className="text-muted-foreground text-xs">Leave blank if you haven't paid it yet.</p>
                     <InputError message={errors.paid_on} />
                 </div>
 
                 <div className="grid gap-2">
-                    <Label htmlFor="attachment">Invoice or receipt</Label>
-                    {expense?.has_attachment && !data.remove_attachment && !data.attachment && (
-                        <div className="flex items-center gap-3 text-sm">
-                            <a href={route('expenses.attachment', expense.id)} className="inline-flex items-center gap-1.5 hover:underline">
-                                <Paperclip className="size-4" /> {expense.attachment_name}
-                            </a>
-                            <Button type="button" variant="ghost" size="sm" onClick={() => setData('remove_attachment', true)}>
-                                Remove
-                            </Button>
-                        </div>
-                    )}
-                    <Input
-                        id="attachment"
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,application/pdf,image/*"
-                        onChange={(e) => setData('attachment', e.target.files?.[0] ?? null)}
-                    />
-                    <p className="text-muted-foreground text-xs">PDF or photo, up to 10 MB.</p>
-                    {progress && <progress value={progress.percentage} max="100" className="w-full" />}
-                    <InputError message={errors.attachment} />
-                </div>
-
-                <div className="grid gap-2">
                     <Label htmlFor="notes">Notes</Label>
-                    <Textarea id="notes" value={data.notes} onChange={(e) => setData('notes', e.target.value)} />
+                    <Textarea id="notes" value={data.notes} onChange={(e) => edit('notes', e.target.value)} />
                     <InputError message={errors.notes} />
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <Button disabled={processing}>{expense ? 'Save' : 'Add expense'}</Button>
+                    <Button disabled={processing || scan.state === 'reading'}>{expense ? 'Save' : 'Add expense'}</Button>
                     <Button variant="ghost" asChild>
                         <Link href={route('expenses.index')}>Cancel</Link>
                     </Button>

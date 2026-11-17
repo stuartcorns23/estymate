@@ -35,6 +35,13 @@ return [
         ],
     ],
 
+    // Reads uploaded supplier invoices and receipts to fill in expense details.
+    // Leave the key blank to turn this off; drag and drop still works.
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-opus-5-5'),
+    ],
+
     'stripe' => [
         'key' => env('STRIPE_KEY'),
         'secret' => env('STRIPE_SECRET'),
