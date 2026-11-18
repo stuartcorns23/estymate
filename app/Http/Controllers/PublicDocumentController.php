@@ -30,6 +30,7 @@ class PublicDocumentController extends Controller
                 'is_overdue' => $document->isOverdue(),
                 'issue_date' => $document->issue_date->toDateString(),
                 'due_date' => $document->due_date?->toDateString(),
+                'po_number' => $document->po_number,
                 'currency' => $document->currency,
                 'subtotal' => $document->subtotal,
                 'tax_total' => $document->tax_total,

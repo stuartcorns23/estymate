@@ -132,6 +132,17 @@ class AssistantTest extends TestCase
         $this->assertSame(0, AssistantInvoiceDraft::withoutGlobalScopes()->count());
     }
 
+    public function test_prepared_invoices_use_the_clients_po_number_unless_given_one()
+    {
+        $this->client->update(['default_po_number' => 'PO-SAVED']);
+        $line = [['description' => 'Work', 'quantity' => '1', 'unit_price' => '10.00', 'vat_rate' => '20.00']];
+
+        $this->tools()->run('prepare_invoice', ['client_id' => $this->client->id, 'items' => $line]);
+        $this->tools()->run('prepare_invoice', ['client_id' => $this->client->id, 'po_number' => 'PO-NEW', 'items' => $line]);
+
+        $this->assertSame(['PO-SAVED', 'PO-NEW'], AssistantInvoiceDraft::withoutGlobalScopes()->orderBy('id')->get()->map(fn ($draft) => $draft->data['po_number'])->all());
+    }
+
     public function test_expense_totals_are_grouped()
     {
         Expense::factory()->create(['supplier' => 'Timber Co', 'total' => 12000, 'vat_amount' => 2000, 'date' => '2026-07-02', 'category' => ExpenseCategory::Materials]);
@@ -151,7 +162,8 @@ class AssistantTest extends TestCase
         $this->fakeClaude([
             $this->message([['type' => 'tool_use', 'id' => 'toolu_1', 'name' => 'prepare_invoice', 'input' => [
                 'client_id' => $this->client->id,
-                'reference' => 'PO-77',
+                'po_number' => 'PO-77',
+                'reference' => 'JOB-5',
                 'items' => [
                     ['description' => 'Kitchen fitting', 'quantity' => '2', 'unit' => 'days', 'unit_price' => '250.00', 'vat_rate' => '20'],
                     ['description' => 'Skip hire', 'quantity' => '1', 'unit_price' => '80', 'vat_rate' => '0.00'],
@@ -183,7 +195,8 @@ class AssistantTest extends TestCase
         $invoice = Document::sole();
         $this->assertSame(DocumentStatus::Draft, $invoice->status);
         $this->assertSame($this->client->id, $invoice->client_id);
-        $this->assertSame('PO-77', $invoice->reference);
+        $this->assertSame('PO-77', $invoice->po_number);
+        $this->assertSame('JOB-5', $invoice->reference);
         $this->assertSame(68000, $invoice->total);
         $this->assertSame(['Kitchen fitting', 'Skip hire'], $invoice->items->pluck('description')->all());
 

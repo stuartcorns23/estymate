@@ -38,6 +38,7 @@ class DocumentController extends Controller
             ->when($search, fn ($query) => $query->where(fn ($query) => $query
                 ->where('number', 'like', "%{$search}%")
                 ->orWhere('reference', 'like', "%{$search}%")
+                ->orWhere('po_number', 'like', "%{$search}%")
                 ->orWhereHas('client', fn ($query) => $query->where('name', 'like', "%{$search}%"))))
             ->latest('issue_date')
             ->latest('id')
@@ -67,6 +68,7 @@ class DocumentController extends Controller
                 'issue_date' => today()->toDateString(),
                 'due_date' => today()->addDays($type->requestsPayment() ? $business->payment_terms_days : 30)->toDateString(),
                 'reference' => '',
+                'po_number' => $source?->default_po_number ?? '',
                 'notes' => $type->requestsPayment() ? ($business->payment_details ?? '') : '',
                 'items' => [],
             ],
@@ -95,6 +97,7 @@ class DocumentController extends Controller
                 ...$this->summary($document),
                 'due_date' => $document->due_date?->toDateString(),
                 'reference' => $document->reference,
+                'po_number' => $document->po_number,
                 'notes' => $document->notes,
                 'subtotal' => $document->subtotal,
                 'tax_total' => $document->tax_total,
@@ -157,6 +160,7 @@ class DocumentController extends Controller
                 'issue_date' => $document->issue_date->toDateString(),
                 'due_date' => $document->due_date?->toDateString(),
                 'reference' => $document->reference ?? '',
+                'po_number' => $document->po_number ?? '',
                 'notes' => $document->notes ?? '',
                 'items' => $document->items->map(fn ($item) => [
                     'product_id' => $item->product_id,
@@ -240,7 +244,7 @@ class DocumentController extends Controller
 
         return [
             'type' => $this->typeProps($type),
-            'clients' => Client::orderBy('name')->get(['id', 'name', 'email']),
+            'clients' => Client::orderBy('name')->get(['id', 'name', 'email', 'default_po_number']),
             'products' => Product::with('taxRate:id,rate')->orderBy('name')->get()->map(fn (Product $product) => [
                 'id' => $product->id,
                 'name' => $product->name,

@@ -13,7 +13,7 @@ class SaveDocument
     /**
      * Create or update a document with its line items and totals.
      *
-     * @param  array{client_id: int, issue_date: string, due_date?: ?string, reference?: ?string, notes?: ?string, items: list<array{product_id?: ?int, description: string, quantity: string|float, unit?: ?string, unit_price: string|float, tax_rate: string|float}>}  $data
+     * @param  array{client_id: int, issue_date: string, due_date?: ?string, reference?: ?string, po_number?: ?string, notes?: ?string, items: list<array{product_id?: ?int, description: string, quantity: string|float, unit?: ?string, unit_price: string|float, tax_rate: string|float}>}  $data
      */
     public function handle(Document $document, DocumentType $type, array $data): Document
     {

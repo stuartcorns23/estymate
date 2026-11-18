@@ -39,6 +39,7 @@ class Document extends Model
         'issue_date',
         'due_date',
         'reference',
+        'po_number',
         'notes',
     ];
 

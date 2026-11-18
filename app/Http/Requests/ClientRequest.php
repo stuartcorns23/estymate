@@ -25,6 +25,7 @@ class ClientRequest extends FormRequest
             'county' => ['nullable', 'string', 'max:255'],
             'postcode' => ['nullable', 'string', 'max:20'],
             'vat_number' => ['nullable', 'string', 'max:30'],
+            'default_po_number' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ];
     }

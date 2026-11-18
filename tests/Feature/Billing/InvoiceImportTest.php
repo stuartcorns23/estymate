@@ -55,10 +55,10 @@ class InvoiceImportTest extends TestCase
     private function linesCsv(): string
     {
         return implode("\n", [
-            'Invoice No;Customer;Invoice Date;Due Date;Description;Qty;Unit Price;VAT %;Status',
-            '1001;Acme Plumbing;01/04/2025;30/04/2025;Boiler service;1;80.00;20%;Paid',
-            '1001;Acme Plumbing;01/04/2025;30/04/2025;Parts;2;12.50;20%;Paid',
-            '1002;New Client Co;05/04/2025;05/05/2025;Consultation;1.5;100;0;Unpaid',
+            'Invoice No;Customer;Invoice Date;Due Date;Description;Qty;Unit Price;VAT %;Status;PO Number',
+            '1001;Acme Plumbing;01/04/2025;30/04/2025;Boiler service;1;80.00;20%;Paid;PO-881',
+            '1001;Acme Plumbing;01/04/2025;30/04/2025;Parts;2;12.50;20%;Paid;',
+            '1002;New Client Co;05/04/2025;05/05/2025;Consultation;1.5;100;0;Unpaid;',
         ]);
     }
 
@@ -195,7 +195,7 @@ class InvoiceImportTest extends TestCase
 
         $this->assertSame('Billdu', $preview['format']);
         $this->assertSame([
-            'document_type', 'number', 'reference', null, 'client_name', 'client_vat_number', 'client_address_line_1',
+            'document_type', 'number', 'reference', 'po_number', 'client_name', 'client_vat_number', 'client_address_line_1',
             'client_address_line_2', 'client_city', 'client_postcode', 'client_country', null, 'issue_date', 'due_date',
             null, 'discount', 'total', 'currency', 'paid_date', 'amount_paid', 'payment_method', 'payment_reference',
             'payment_note', null,
@@ -227,6 +227,10 @@ class InvoiceImportTest extends TestCase
         $this->assertSame([10000, 10000], $party->payments->pluck('amount')->all());
         $this->assertSame('001 · Paid by card', $party->payments[1]->reference);
 
+        // Billdu's "Order number" is the PO number, but it repeats the invoice number when none was given.
+        $this->assertSame('GLS-071', $glass->reference);
+        $this->assertNull($glass->po_number);
+
         $discounted = Document::where('number', 'INV-081')->firstOrFail();
         $this->assertSame($party->client_id, $discounted->client_id);
         $this->assertStringContainsString('Discount in the old app: 15.00', $discounted->notes);
@@ -245,7 +249,7 @@ class InvoiceImportTest extends TestCase
         $preview = $this->preview($this->linesCsv());
 
         $this->assertNull($preview['format']);
-        $this->assertSame(['number', 'client_name', 'issue_date', 'due_date', 'description', 'quantity', 'unit_price', 'vat_rate', 'status'], $preview['mapping']);
+        $this->assertSame(['number', 'client_name', 'issue_date', 'due_date', 'description', 'quantity', 'unit_price', 'vat_rate', 'status', 'po_number'], $preview['mapping']);
         $this->assertCount(2, $preview['invoices']);
 
         $this->post('/invoices/import', [
@@ -261,6 +265,7 @@ class InvoiceImportTest extends TestCase
         $this->assertSame(DocumentStatus::Paid, $first->status);
         $this->assertSame('Parts', $first->items[1]->description);
         $this->assertSame(1250, $first->items[1]->unit_price);
+        $this->assertSame('PO-881', $first->po_number);
 
         $second = Document::where('number', '1002')->firstOrFail();
         $this->assertSame(15000, $second->total);

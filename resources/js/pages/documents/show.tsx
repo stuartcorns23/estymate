@@ -45,6 +45,7 @@ interface Item {
 
 interface DocumentDetail extends DocumentSummary {
     reference: string | null;
+    po_number: string | null;
     notes: string | null;
     subtotal: number;
     tax_total: number;
@@ -579,6 +580,12 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                                 <>
                                     <dt className="text-muted-foreground">{requestsPayment ? 'Due' : 'Valid until'}</dt>
                                     <dd className="text-right">{formatDate(document.due_date)}</dd>
+                                </>
+                            )}
+                            {document.po_number && (
+                                <>
+                                    <dt className="text-muted-foreground">PO number</dt>
+                                    <dd className="text-right">{document.po_number}</dd>
                                 </>
                             )}
                             {document.reference && (

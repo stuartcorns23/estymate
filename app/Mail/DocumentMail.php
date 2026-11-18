@@ -24,7 +24,8 @@ class DocumentMail extends Mailable
 
         return new Envelope(
             replyTo: $business->email ? [new Address($business->email, $business->name)] : [],
-            subject: "{$this->document->type->label()} {$this->document->number} from {$business->name}",
+            subject: "{$this->document->type->label()} {$this->document->number} from {$business->name}"
+                .($this->document->po_number ? " (PO {$this->document->po_number})" : ''),
         );
     }
 

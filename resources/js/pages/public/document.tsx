@@ -16,6 +16,7 @@ interface PublicDocumentProps {
         is_overdue: boolean;
         issue_date: string;
         due_date: string | null;
+        po_number: string | null;
         currency: string;
         subtotal: number;
         tax_total: number;
@@ -97,6 +98,12 @@ export default function PublicDocument({ document, justPaid }: PublicDocumentPro
                                     <>
                                         <dt className="text-muted-foreground">{requestsPayment ? 'Due' : 'Valid until'}</dt>
                                         <dd className="text-right">{formatDate(document.due_date)}</dd>
+                                    </>
+                                )}
+                                {document.po_number && (
+                                    <>
+                                        <dt className="text-muted-foreground">PO number</dt>
+                                        <dd className="text-right">{document.po_number}</dd>
                                     </>
                                 )}
                                 <dt className="text-muted-foreground">Status</dt>

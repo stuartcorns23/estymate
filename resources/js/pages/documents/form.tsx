@@ -26,6 +26,7 @@ type DocumentFormData = {
     issue_date: string;
     due_date: string;
     reference: string;
+    po_number: string;
     notes: string;
     items: LineItem[];
 };
@@ -41,7 +42,7 @@ interface ProductOption {
 
 interface DocumentFormProps {
     type: DocumentTypeInfo;
-    clients: { id: number; name: string; email: string | null }[];
+    clients: { id: number; name: string; email: string | null; default_po_number: string | null }[];
     products: ProductOption[];
     taxRates: TaxRate[];
     document: {
@@ -51,6 +52,7 @@ interface DocumentFormProps {
         issue_date: string;
         due_date: string | null;
         reference: string;
+        po_number: string;
         notes: string;
         items: LineItem[];
     };
@@ -83,9 +85,18 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
         issue_date: document.issue_date,
         due_date: document.due_date ?? '',
         reference: document.reference,
+        po_number: document.po_number,
         notes: document.notes,
         items: document.items.length ? document.items.map((item) => ({ ...item, quantity: String(Number(item.quantity)) })) : [emptyLine()],
     });
+
+    // Switching client brings in their PO number, unless one has been typed that isn't the old client's.
+    const chooseClient = (clientId: string) => {
+        const poFor = (id: string) => clients.find((client) => String(client.id) === id)?.default_po_number ?? '';
+        const keepTyped = data.po_number !== '' && data.po_number !== poFor(data.client_id);
+
+        setData((current) => ({ ...current, client_id: clientId, po_number: keepTyped ? current.po_number : poFor(clientId) }));
+    };
 
     const errorFor = (key: string) => (errors as Record<string, string | undefined>)[key];
 
@@ -154,7 +165,7 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="grid gap-2 sm:col-span-2">
                         <Label htmlFor="client_id">Client</Label>
-                        <Select value={data.client_id} onValueChange={(value) => setData('client_id', value)}>
+                        <Select value={data.client_id} onValueChange={chooseClient}>
                             <SelectTrigger id="client_id">
                                 <SelectValue placeholder="Choose a client" />
                             </SelectTrigger>
@@ -182,8 +193,19 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                     </div>
 
                     <div className="grid gap-2 sm:col-span-2">
-                        <Label htmlFor="reference">Reference or PO number</Label>
-                        <Input id="reference" value={data.reference} onChange={(e) => setData('reference', e.target.value)} />
+                        <Label htmlFor="po_number">Client's PO number</Label>
+                        <Input id="po_number" value={data.po_number} onChange={(e) => setData('po_number', e.target.value)} placeholder="Optional" />
+                        <InputError message={errors.po_number} />
+                    </div>
+
+                    <div className="grid gap-2 sm:col-span-2">
+                        <Label htmlFor="reference">Your reference</Label>
+                        <Input
+                            id="reference"
+                            value={data.reference}
+                            onChange={(e) => setData('reference', e.target.value)}
+                            placeholder="Optional, such as a job number"
+                        />
                         <InputError message={errors.reference} />
                     </div>
                 </div>

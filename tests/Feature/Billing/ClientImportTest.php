@@ -155,16 +155,16 @@ class ClientImportTest extends TestCase
     public function test_other_csvs_can_be_mapped_by_hand()
     {
         $this->user();
-        $csv = "Company;Who;Mail;Town\nNorth Ltd;Eve;eve@north.test;Leeds\n";
+        $csv = "Company;Who;Mail;Town;PO number\nNorth Ltd;Eve;eve@north.test;Leeds;PO-12\n";
 
         $preview = $this->postJson('/clients/import/preview', ['csv' => $csv])->assertOk();
         $preview->assertJsonPath('format', null);
-        $preview->assertJsonPath('mapping', ['name', null, 'email', 'city']);
+        $preview->assertJsonPath('mapping', ['name', null, 'email', 'city', 'default_po_number']);
 
-        $this->post('/clients/import', ['csv' => $csv, 'mapping' => ['name', 'contact_name', 'email', 'county'], 'rows' => [2]])
+        $this->post('/clients/import', ['csv' => $csv, 'mapping' => ['name', 'contact_name', 'email', 'county', 'default_po_number'], 'rows' => [2]])
             ->assertRedirect('/clients');
 
-        $this->assertDatabaseHas('clients', ['name' => 'North Ltd', 'contact_name' => 'Eve', 'county' => 'Leeds', 'city' => null]);
+        $this->assertDatabaseHas('clients', ['name' => 'North Ltd', 'contact_name' => 'Eve', 'county' => 'Leeds', 'city' => null, 'default_po_number' => 'PO-12']);
     }
 
     public function test_unreadable_files_are_rejected()

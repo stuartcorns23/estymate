@@ -106,7 +106,9 @@ class DocumentActionController extends Controller
 
         $greeting = $document->client->contact_name ? "Hello {$document->client->contact_name}," : 'Hello,';
 
-        $lines = [$greeting, '', "Please find attached {$label} {$document->number} for {$total}."];
+        $lines = [$greeting, '', $document->po_number
+            ? "Please find attached {$label} {$document->number} for {$total}, for your purchase order {$document->po_number}."
+            : "Please find attached {$label} {$document->number} for {$total}."];
 
         if ($document->type->requestsPayment() && $document->due_date) {
             $lines[] = "Payment is due by {$document->due_date->format('j F Y')}.";

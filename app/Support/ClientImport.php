@@ -38,6 +38,7 @@ class ClientImport
         'postcode' => ['label' => 'Postcode', 'max' => 20],
         'country' => ['label' => 'Country', 'max' => 2],
         'vat_number' => ['label' => 'VAT number', 'max' => 30],
+        'default_po_number' => ['label' => 'PO number', 'max' => 100],
         'notes' => ['label' => 'Add to notes', 'max' => 5000],
     ];
 
@@ -56,6 +57,7 @@ class ClientImport
         'postcode' => ['zipcode', 'zip', 'postcode', 'postalcode', 'billingpostcode', 'billingzip'],
         'country' => ['countrycode', 'country', 'billingcountry'],
         'vat_number' => ['vatregno', 'vatnumber', 'vat', 'vatno', 'vatregistrationnumber', 'vatid'],
+        'default_po_number' => ['ponumber', 'pono', 'po', 'purchaseorder', 'purchaseordernumber', 'purchaseorderno'],
         'notes' => ['note', 'notes', 'comment', 'comments', 'description', 'website', 'web', 'url', 'fax', 'id', 'taxid', 'companynumber', 'companyregno', 'registrationnumber', 'crn'],
     ];
 

@@ -61,7 +61,7 @@ class AssistantTools
                     'properties' => [
                         'status' => ['type' => 'string', 'enum' => ['any', 'draft', 'unpaid', 'overdue', 'paid', 'void']],
                         'client' => ['type' => 'string', 'description' => 'Part of a client\'s name.'],
-                        'number' => ['type' => 'string', 'description' => 'Part of an invoice number or reference.'],
+                        'number' => ['type' => 'string', 'description' => 'Part of an invoice number, PO number or reference.'],
                         'issued_from' => $date,
                         'issued_to' => $date,
                         'limit' => $limit,
@@ -169,7 +169,8 @@ class AssistantTools
                         'client_id' => ['type' => 'integer', 'description' => 'From find_clients.'],
                         'issue_date' => ['type' => 'string', 'description' => 'YYYY-MM-DD. Defaults to today.'],
                         'due_date' => ['type' => 'string', 'description' => 'YYYY-MM-DD. Defaults to the business\'s payment terms.'],
-                        'reference' => ['type' => 'string', 'description' => 'A PO number or job reference, if the person gave one.'],
+                        'po_number' => ['type' => 'string', 'description' => 'The client\'s purchase order (PO) number, if the person gave one. Leave out to use the client\'s saved PO number.'],
+                        'reference' => ['type' => 'string', 'description' => 'The person\'s own job reference, if they gave one (not a PO number).'],
                         'notes' => ['type' => 'string', 'description' => 'Notes to print on the invoice. Defaults to the business\'s payment details.'],
                         'items' => [
                             'type' => 'array',
@@ -241,6 +242,7 @@ class AssistantTools
                 ->whereHas('client', fn (Builder $query) => $query->where('name', 'like', '%'.$this->like($client).'%')))
             ->when($input['number'] ?? null, fn (Builder $query, string $number) => $query->where(fn (Builder $query) => $query
                 ->where('number', 'like', '%'.$this->like($number).'%')
+                ->orWhere('po_number', 'like', '%'.$this->like($number).'%')
                 ->orWhere('reference', 'like', '%'.$this->like($number).'%')))
             ->when($this->date($input, 'issued_from'), fn (Builder $query, Carbon $from) => $query->whereDate('issue_date', '>=', $from))
             ->when($this->date($input, 'issued_to'), fn (Builder $query, Carbon $to) => $query->whereDate('issue_date', '<=', $to));
@@ -283,6 +285,7 @@ class AssistantTools
 
         return [
             ...$this->invoiceSummary($invoice),
+            'po_number' => $invoice->po_number,
             'reference' => $invoice->reference,
             'client_email' => $invoice->client?->email,
             'subtotal' => $this->money($invoice->subtotal),
@@ -442,6 +445,7 @@ class AssistantTools
                 'id' => $client->id,
                 'name' => $client->name,
                 'email' => $client->email,
+                'po_number' => $client->default_po_number,
                 'owes' => $this->money($owed[$client->id] ?? 0),
             ])->all(),
         ];
@@ -490,6 +494,9 @@ class AssistantTools
             'client_id' => $input['client_id'] ?? null,
             'issue_date' => $input['issue_date'] ?? today()->toDateString(),
             'due_date' => $input['due_date'] ?? null,
+            'po_number' => array_key_exists('po_number', $input)
+                ? $input['po_number']
+                : Client::where('business_id', $this->business->id)->whereKey((int) ($input['client_id'] ?? 0))->value('default_po_number'),
             'reference' => $input['reference'] ?? null,
             'notes' => $input['notes'] ?? $this->business->payment_details,
             'items' => array_map(fn ($item) => [
@@ -543,6 +550,7 @@ class AssistantTools
             'client_id' => ['required', 'integer', Rule::exists('clients', 'id')->where('business_id', $business->id)->whereNull('deleted_at')],
             'issue_date' => ['required', 'date_format:Y-m-d'],
             'due_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:issue_date'],
+            'po_number' => ['nullable', 'string', 'max:100'],
             'reference' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'items' => ['required', 'array', 'min:1', 'max:200'],
@@ -587,6 +595,7 @@ class AssistantTools
             'client_name' => $business->clients()->withTrashed()->whereKey($data['client_id'])->value('name'),
             'issue_date' => $data['issue_date'],
             'due_date' => $data['due_date'] ?? null,
+            'po_number' => $data['po_number'] ?? null,
             'reference' => $data['reference'] ?? null,
             'items' => $items,
             'subtotal' => $subtotal,

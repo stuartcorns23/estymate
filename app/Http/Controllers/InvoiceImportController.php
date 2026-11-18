@@ -152,6 +152,7 @@ class InvoiceImportController extends Controller
             'issue_date' => $invoice['issue_date'],
             'due_date' => $invoice['due_date'],
             'reference' => $invoice['reference'],
+            'po_number' => $invoice['po_number'],
             'notes' => $invoice['notes'],
             'currency' => $invoice['currency'],
             'subtotal' => $invoice['subtotal'],
