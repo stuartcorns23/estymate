@@ -11,6 +11,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentActionController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\ExpenseImportController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\InvoiceImportController;
 use App\Http\Controllers\PaymentController;
@@ -55,6 +56,9 @@ Route::middleware(['auth', 'business'])->group(function () {
     Route::post('clients/import', [ClientImportController::class, 'store'])->name('clients.import.store');
     Route::resource('clients', ClientController::class)->except('show');
     Route::resource('products', ProductController::class)->except('show');
+    Route::get('expenses/import', [ExpenseImportController::class, 'create'])->name('expenses.import');
+    Route::post('expenses/import/preview', [ExpenseImportController::class, 'preview'])->name('expenses.import.preview');
+    Route::post('expenses/import', [ExpenseImportController::class, 'store'])->name('expenses.import.store');
     Route::post('expenses/scan', [ExpenseController::class, 'scan'])->middleware('throttle:20,1')->name('expenses.scan');
     Route::resource('expenses', ExpenseController::class)->except('show');
     Route::get('expenses/{expense}/attachment', [ExpenseController::class, 'attachment'])->name('expenses.attachment');
