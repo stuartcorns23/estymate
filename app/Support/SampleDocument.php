@@ -47,7 +47,7 @@ class SampleDocument
         $document = new Document([
             'issue_date' => now()->startOfDay(),
             'due_date' => now()->startOfDay()->addDays($type->requestsPayment() ? $business->payment_terms_days : 30),
-            'reference' => 'PO-2291',
+            'po_number' => 'PO-2291',
             'notes' => $type->requestsPayment() ? $business->payment_details : 'This estimate is valid for 30 days.',
         ]);
 

@@ -32,6 +32,7 @@ interface Draft {
     client_name: string | null;
     issue_date: string;
     due_date: string | null;
+    po_number: string | null;
     reference: string | null;
     items: DraftLine[];
     subtotal: number;
@@ -350,6 +351,7 @@ function DraftCard({ draft, onChange }: { draft: Draft; onChange: (draft: Draft)
                         <p className="text-muted-foreground text-xs">
                             Issued {formatDate(draft.issue_date)}
                             {draft.due_date && <> · due {formatDate(draft.due_date)}</>}
+                            {draft.po_number && <> · PO {draft.po_number}</>}
                             {draft.reference && <> · ref {draft.reference}</>}
                         </p>
                     </div>

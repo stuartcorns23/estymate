@@ -31,6 +31,7 @@ class Client extends Model
         'postcode',
         'country',
         'vat_number',
+        'default_po_number',
         'notes',
     ];
 

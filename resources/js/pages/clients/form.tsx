@@ -11,12 +11,17 @@ import { FormEventHandler } from 'react';
 
 type ClientField = Exclude<keyof Client, 'id' | 'documents_count'>;
 
-const fields: { name: ClientField; label: string; type?: string; autoComplete?: string; wide?: boolean }[] = [
+const fields: { name: ClientField; label: string; type?: string; autoComplete?: string; wide?: boolean; hint?: string }[] = [
     { name: 'name', label: 'Client or business name', autoComplete: 'organization', wide: true },
     { name: 'contact_name', label: 'Contact name', autoComplete: 'name' },
     { name: 'email', label: 'Email', type: 'email', autoComplete: 'email' },
     { name: 'phone', label: 'Phone', type: 'tel', autoComplete: 'tel' },
     { name: 'vat_number', label: 'VAT number' },
+    {
+        name: 'default_po_number',
+        label: 'PO number',
+        hint: 'Filled in on new invoices, estimates and pro-formas for this client. You can change it on each one.',
+    },
     { name: 'address_line_1', label: 'Address line 1', autoComplete: 'address-line1' },
     { name: 'address_line_2', label: 'Address line 2', autoComplete: 'address-line2' },
     { name: 'city', label: 'Town or city', autoComplete: 'address-level2' },
@@ -37,6 +42,7 @@ export default function ClientForm({ client }: { client: Client | null }) {
         email: client?.email ?? '',
         phone: client?.phone ?? '',
         vat_number: client?.vat_number ?? '',
+        default_po_number: client?.default_po_number ?? '',
         address_line_1: client?.address_line_1 ?? '',
         address_line_2: client?.address_line_2 ?? '',
         city: client?.city ?? '',
@@ -94,6 +100,7 @@ export default function ClientForm({ client }: { client: Client | null }) {
                                 value={data[field.name]}
                                 onChange={(e) => setData(field.name, e.target.value)}
                             />
+                            {field.hint && <p className="text-muted-foreground text-xs">{field.hint}</p>}
                             <InputError message={errors[field.name]} />
                         </div>
                     ))}

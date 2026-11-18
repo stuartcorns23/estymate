@@ -114,6 +114,7 @@ export interface Client {
     county: string | null;
     postcode: string | null;
     vat_number: string | null;
+    default_po_number: string | null;
     notes: string | null;
     documents_count?: number;
 }

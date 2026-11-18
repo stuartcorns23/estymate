@@ -47,6 +47,7 @@ class DocumentRequest extends FormRequest
             'issue_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issue_date'],
             'reference' => ['nullable', 'string', 'max:255'],
+            'po_number' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'items' => ['required', 'array', 'min:1', 'max:200'],
             'items.*.product_id' => [
