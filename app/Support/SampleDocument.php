@@ -46,9 +46,15 @@ class SampleDocument
 
         $document = new Document([
             'issue_date' => now()->startOfDay(),
-            'due_date' => now()->startOfDay()->addDays($type->requestsPayment() ? $business->payment_terms_days : 30),
+            'due_date' => $type->hasDueDate() ? now()->startOfDay()->addDays($type->requestsPayment() ? $business->payment_terms_days : 30) : null,
             'po_number' => 'PO-2291',
-            'notes' => $type->requestsPayment() ? $business->payment_details : 'This estimate is valid for 30 days.',
+            'notes' => match ($type) {
+                DocumentType::Estimate => 'This estimate is valid for 30 days.',
+                DocumentType::CreditNote => 'Credit for the cancelled second phase.',
+                DocumentType::DeliveryNote => 'Please check the goods and sign below.',
+                default => $business->payment_details,
+            },
+            'delivery_address' => $type === DocumentType::DeliveryNote ? "Site office\nUnit 4, Riverside Park\nLeeds LS10 1AB" : null,
         ]);
 
         $prefix = $business->documentPrefix($type);
@@ -62,7 +68,17 @@ class SampleDocument
             'tax_total' => $items->sum('tax_amount'),
             'total' => $items->sum('net_amount') + $items->sum('tax_amount'),
             'amount_paid' => 0,
+            'amount_credited' => 0,
         ]);
+
+        $invoice = null;
+
+        if ($type === DocumentType::CreditNote) {
+            $invoice = (new Document(['issue_date' => now()->startOfDay()->subDays(14)]))
+                ->forceFill(['type' => DocumentType::Invoice, 'number' => $business->documentPrefix(DocumentType::Invoice).'0041']);
+        }
+
+        $document->setRelation('source', $invoice);
 
         $document->setRelation('business', $business);
         $document->setRelation('client', $client);

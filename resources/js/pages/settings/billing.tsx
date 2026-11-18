@@ -20,6 +20,7 @@ const limitLabels: Record<keyof PlanInfo['limits'], string> = {
     invoices_per_month: 'Invoices this month',
     estimates_per_month: 'Estimates this month',
     proformas_per_month: 'Pro-forma invoices this month',
+    deliverynotes_per_month: 'Delivery notes this month',
     team_members: 'Team members',
     assistant_messages_per_month: 'Assistant questions this month',
 };
@@ -145,6 +146,7 @@ export default function Billing({ plan, usage, plans, subscription, trial_ends_a
                                             <li>{limitText(option.limits.invoices_per_month, 'invoices a month')}</li>
                                             <li>{limitText(option.limits.estimates_per_month, 'estimates a month')}</li>
                                             <li>{limitText(option.limits.proformas_per_month, 'pro-forma invoices a month')}</li>
+                                            <li>{limitText(option.limits.deliverynotes_per_month, 'delivery notes a month')}</li>
                                             <li>{limitText(option.limits.assistant_messages_per_month, 'assistant questions a month')}</li>
                                             <li>{limitText(option.limits.team_members, option.limits.team_members === 1 ? 'user' : 'users')}</li>
                                             {option.features?.tax_return && <li>Tax return figures</li>}

@@ -21,7 +21,7 @@ class PaymentController extends Controller
     public function store(Request $request, Document $document): RedirectResponse
     {
         abort_unless($document->type === DocumentType::Invoice, 404);
-        abort_if(in_array($document->status, [DocumentStatus::Void, DocumentStatus::Paid], true), 403);
+        abort_if(in_array($document->status, [DocumentStatus::Void, DocumentStatus::Paid, DocumentStatus::Credited], true), 403);
 
         $balance = $document->balanceDue();
 

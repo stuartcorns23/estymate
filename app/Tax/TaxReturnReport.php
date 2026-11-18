@@ -52,7 +52,7 @@ class TaxReturnReport
             'expenses' => 0,
         ], $this->taxYear->quarters());
 
-        [$turnover, $outputVat, $salesCount] = $this->income($quarters);
+        [$turnover, $outputVat, $salesCount, $credits] = $this->income($quarters);
         [$boxes, $totalExpenses, $inputVat, $expenseCount] = $this->expenses($quarters);
 
         return [
@@ -72,6 +72,8 @@ class TaxReturnReport
             'business_name' => $this->business->name,
             'turnover' => $turnover,
             'sales_count' => $salesCount,
+            // Credit notes (accrual) or refunds (cash) already taken off the turnover, without VAT.
+            'credits' => $credits,
             'expense_boxes' => $boxes,
             'total_expenses' => $totalExpenses,
             'expense_count' => $expenseCount,
@@ -92,16 +94,21 @@ class TaxReturnReport
     }
 
     /**
-     * Turnover (without VAT) and the VAT charged on it.
+     * Turnover (without VAT) and the VAT charged on it, after credit notes.
+     *
+     * On the cash basis, money paid back to clients against credit notes comes off in the period it
+     * was refunded. Otherwise, issued credit notes come off in the period they're dated, as HMRC
+     * expects for VAT.
      *
      * @param  list<array{label: string, turnover: int, expenses: int}>  $quarters
-     * @return array{int, int, int}
+     * @return array{int, int, int, array{count: int, amount: int}}
      */
     private function income(array &$quarters): array
     {
         $turnover = 0;
         $vat = 0;
         $count = 0;
+        $credits = ['count' => 0, 'amount' => 0];
 
         if ($this->basis === AccountingBasis::Cash) {
             $payments = Payment::query()
@@ -124,13 +131,31 @@ class TaxReturnReport
                 $quarters[$this->quarterOf($payment->paid_on)]['turnover'] += $net;
             }
 
-            return [$turnover, $vat, $count];
+            $refunds = Document::query()
+                ->whereBelongsTo($this->business)
+                ->ofType(DocumentType::CreditNote)
+                ->where('refund_amount', '>', 0)
+                ->tap(fn ($query) => $this->inYear($query, 'refunded_on'))
+                ->get(['id', 'refunded_on', 'refund_amount', 'total', 'tax_total']);
+
+            foreach ($refunds as $refund) {
+                $refundVat = $refund->total > 0 ? (int) round($refund->refund_amount * $refund->tax_total / $refund->total) : 0;
+                $net = $refund->refund_amount - $refundVat;
+
+                $turnover -= $net;
+                $vat -= $refundVat;
+                $credits['count']++;
+                $credits['amount'] += $net;
+                $quarters[$this->quarterOf($refund->refunded_on)]['turnover'] -= $net;
+            }
+
+            return [$turnover, $vat, $count, $credits];
         }
 
         $invoices = Document::query()
             ->whereBelongsTo($this->business)
             ->ofType(DocumentType::Invoice)
-            ->whereIn('status', [DocumentStatus::Sent, DocumentStatus::Paid])
+            ->whereIn('status', [DocumentStatus::Sent, DocumentStatus::Paid, DocumentStatus::Credited])
             ->tap(fn ($query) => $this->inYear($query, 'issue_date'))
             ->get(['id', 'issue_date', 'subtotal', 'tax_total']);
 
@@ -141,7 +166,22 @@ class TaxReturnReport
             $quarters[$this->quarterOf($invoice->issue_date)]['turnover'] += $invoice->subtotal;
         }
 
-        return [$turnover, $vat, $count];
+        $creditNotes = Document::query()
+            ->whereBelongsTo($this->business)
+            ->ofType(DocumentType::CreditNote)
+            ->where('status', DocumentStatus::Sent)
+            ->tap(fn ($query) => $this->inYear($query, 'issue_date'))
+            ->get(['id', 'issue_date', 'subtotal', 'tax_total']);
+
+        foreach ($creditNotes as $creditNote) {
+            $turnover -= $creditNote->subtotal;
+            $vat -= $creditNote->tax_total;
+            $credits['count']++;
+            $credits['amount'] += $creditNote->subtotal;
+            $quarters[$this->quarterOf($creditNote->issue_date)]['turnover'] -= $creditNote->subtotal;
+        }
+
+        return [$turnover, $vat, $count, $credits];
     }
 
     /**

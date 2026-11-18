@@ -11,6 +11,8 @@ const styles: Record<DocumentStatus | 'overdue', string> = {
     declined: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
     overdue: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
     void: 'bg-muted text-muted-foreground line-through',
+    credited: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
+    delivered: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
 };
 
 export default function DocumentStatusBadge({ status, overdue = false }: { status: DocumentStatus; overdue?: boolean }) {

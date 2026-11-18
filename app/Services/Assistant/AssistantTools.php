@@ -256,7 +256,7 @@ class AssistantTools
             default => null,
         };
 
-        $all = (clone $query)->get(['id', 'total', 'amount_paid']);
+        $all = (clone $query)->get(['id', 'total', 'amount_paid', 'amount_credited']);
         $invoices = $query->latest('issue_date')->latest('id')->limit($this->limit($input))->get();
 
         return [
@@ -322,7 +322,7 @@ class AssistantTools
             ->whereNotIn('status', [DocumentStatus::Draft, DocumentStatus::Void])
             ->whereDate('issue_date', '>=', $from)
             ->whereDate('issue_date', '<=', $to)
-            ->get(['id', 'client_id', 'status', 'issue_date', 'due_date', 'total', 'amount_paid']);
+            ->get(['id', 'client_id', 'status', 'issue_date', 'due_date', 'total', 'amount_paid', 'amount_credited']);
 
         $groups = $invoices->groupBy(fn (Document $invoice) => match ($input['group_by'] ?? 'month') {
             'client' => $invoice->client?->name ?? 'Unknown client',
@@ -436,7 +436,7 @@ class AssistantTools
         $owed = $this->invoices()
             ->where('status', DocumentStatus::Sent)
             ->whereIn('client_id', $clients->pluck('id'))
-            ->get(['client_id', 'total', 'amount_paid'])
+            ->get(['client_id', 'total', 'amount_paid', 'amount_credited'])
             ->groupBy('client_id')
             ->map(fn (Collection $invoices) => (int) $invoices->sum(fn (Document $invoice) => $invoice->balanceDue()));
 

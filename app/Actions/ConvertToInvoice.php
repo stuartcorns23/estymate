@@ -26,7 +26,7 @@ class ConvertToInvoice
 
             $invoice = $source->replicate([
                 'number', 'status', 'type', 'sent_at', 'paid_at', 'source_document_id', 'public_token',
-                'amount_paid', 'last_reminder_at',
+                'amount_paid', 'amount_credited', 'last_reminder_at', 'delivery_address',
             ]);
             $invoice->type = DocumentType::Invoice;
             $invoice->status = DocumentType::Invoice->initialStatus();

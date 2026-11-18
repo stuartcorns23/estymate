@@ -4,8 +4,9 @@
 | Subscription plans for businesses using Estymate.
 |
 | Limits are per business; null means unlimited. Monthly limits count
-| estimates, invoices and pro-forma invoices created since the 1st of the
-| month, including deleted ones. Converting a pro-forma or an estimate
+| estimates, invoices, pro-forma invoices and delivery notes created since
+| the 1st of the month, including deleted ones. Credit notes are never
+| limited, since they correct invoices. Converting a pro-forma or an estimate
 | creates an invoice, so it counts towards the invoice limit too. Prices are in pence and only used for display: the real
 | prices live on the Stripe Prices whose ids are set in .env. A plan can
 | have a monthly and a yearly Stripe Price on the same Stripe Product.
@@ -38,6 +39,7 @@ return [
                 'invoices_per_month' => 5,
                 'estimates_per_month' => 5,
                 'proformas_per_month' => 5,
+                'deliverynotes_per_month' => 5,
                 'team_members' => 1,
                 'assistant_messages_per_month' => 20,
             ],
@@ -57,6 +59,7 @@ return [
                 'invoices_per_month' => 50,
                 'estimates_per_month' => 50,
                 'proformas_per_month' => 50,
+                'deliverynotes_per_month' => 50,
                 'team_members' => 2,
                 'assistant_messages_per_month' => 200,
             ],
@@ -76,6 +79,7 @@ return [
                 'invoices_per_month' => null,
                 'estimates_per_month' => null,
                 'proformas_per_month' => null,
+                'deliverynotes_per_month' => null,
                 'team_members' => 10,
                 'assistant_messages_per_month' => null,
             ],

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Actions\ConvertToInvoice;
+use App\Actions\CopyDocument;
+use App\Actions\IssueCreditNote;
 use App\Enums\DocumentStatus;
 use App\Enums\DocumentType;
 use App\Enums\PaymentMethod;
@@ -36,7 +38,7 @@ class DocumentActionController extends Controller
     /**
      * Email the document to the client with the PDF attached.
      */
-    public function send(Request $request, Document $document): RedirectResponse
+    public function send(Request $request, Document $document, IssueCreditNote $issueCreditNote): RedirectResponse
     {
         $this->ensureType($request, $document);
 
@@ -46,6 +48,11 @@ class DocumentActionController extends Controller
             'email' => ['required', 'email', 'max:255'],
             'message' => ['required', 'string', 'max:5000'],
         ]);
+
+        // Sending a draft credit note issues it, so check it still fits the invoice first.
+        if ($document->type === DocumentType::CreditNote && $document->status === DocumentStatus::Draft) {
+            $issueCreditNote->handle($document, DocumentStatus::Sent);
+        }
 
         Mail::to($validated['email'])->send(new DocumentMail($document, $validated['message']));
 
@@ -96,6 +103,80 @@ class DocumentActionController extends Controller
     }
 
     /**
+     * Start a draft credit note for an issued invoice, with its lines to trim down to what's being credited.
+     */
+    public function creditNote(Request $request, Document $document, CopyDocument $copy): RedirectResponse
+    {
+        $this->ensureType($request, $document);
+
+        abort_unless($document->type === DocumentType::Invoice, 404);
+        abort_unless(in_array($document->status, [DocumentStatus::Sent, DocumentStatus::Paid], true), 403, 'Only sent or paid invoices can be credited. Edit or void a draft instead.');
+        abort_if($document->amount_credited >= $document->total, 403, 'This invoice has already been credited in full.');
+
+        $creditNote = $copy->handle($document, DocumentType::CreditNote);
+
+        return to_route('creditnotes.edit', $creditNote);
+    }
+
+    /**
+     * Start a draft delivery note from an estimate, invoice or pro-forma, with the same lines.
+     */
+    public function deliveryNote(Request $request, Document $document, CopyDocument $copy): RedirectResponse
+    {
+        $this->ensureType($request, $document);
+
+        abort_unless($document->type->makesDeliveryNotes(), 404);
+        abort_if($document->status === DocumentStatus::Void, 403);
+        $document->business->ensureWithinLimit('deliverynotes_per_month');
+
+        $deliveryNote = $copy->handle($document, DocumentType::DeliveryNote);
+
+        return to_route('deliverynotes.edit', $deliveryNote);
+    }
+
+    /**
+     * Record money paid back to the client against an issued credit note, for an invoice they'd already paid.
+     */
+    public function refund(Request $request, Document $document): RedirectResponse
+    {
+        $this->ensureType($request, $document);
+
+        abort_unless($document->type === DocumentType::CreditNote, 404);
+
+        $refundable = $document->refundable();
+        abort_if($refundable === 0, 403, 'Nothing on this credit note is owed back to the client.');
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'gt:0', 'decimal:0,2', 'max:'.($refundable / 100)],
+            'refunded_on' => ['required', 'date', 'before_or_equal:today'],
+            'method' => ['required', Rule::in(array_map(fn ($method) => $method->value, PaymentMethod::manual()))],
+            'reference' => ['nullable', 'string', 'max:255'],
+        ], [
+            'amount.max' => 'That is more than the '.Money::format($refundable, $document->currency).' owed back to the client.',
+        ]);
+
+        $document->forceFill([
+            'refund_amount' => Money::toPence($validated['amount']),
+            'refunded_on' => $validated['refunded_on'],
+            'refund_method' => $validated['method'],
+            'refund_reference' => $validated['reference'] ?? null,
+        ])->save();
+
+        return back()->with('status', 'Refund recorded.');
+    }
+
+    public function destroyRefund(Request $request, Document $document): RedirectResponse
+    {
+        $this->ensureType($request, $document);
+
+        abort_unless($document->type === DocumentType::CreditNote, 404);
+
+        $document->forceFill(['refund_amount' => 0, 'refunded_on' => null, 'refund_method' => null, 'refund_reference' => null])->save();
+
+        return back();
+    }
+
+    /**
      * The default email message for a document.
      */
     public static function defaultMessage(Document $document): string
@@ -106,9 +187,15 @@ class DocumentActionController extends Controller
 
         $greeting = $document->client->contact_name ? "Hello {$document->client->contact_name}," : 'Hello,';
 
+        $for = $document->type->showsPrices() ? " for {$total}" : '';
+
         $lines = [$greeting, '', $document->po_number
-            ? "Please find attached {$label} {$document->number} for {$total}, for your purchase order {$document->po_number}."
-            : "Please find attached {$label} {$document->number} for {$total}."];
+            ? "Please find attached {$label} {$document->number}{$for}, for your purchase order {$document->po_number}."
+            : "Please find attached {$label} {$document->number}{$for}."];
+
+        if ($document->type === DocumentType::CreditNote && $document->source) {
+            $lines[] = "It credits invoice {$document->source->number}.";
+        }
 
         if ($document->type->requestsPayment() && $document->due_date) {
             $lines[] = "Payment is due by {$document->due_date->format('j F Y')}.";

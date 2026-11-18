@@ -42,6 +42,8 @@ export default function BusinessSettings({ business, taxRates, canUpdate }: { bu
         company_number: business.company_number ?? '',
         estimate_prefix: business.estimate_prefix,
         proforma_prefix: business.proforma_prefix,
+        creditnote_prefix: business.creditnote_prefix,
+        deliverynote_prefix: business.deliverynote_prefix,
         invoice_prefix: business.invoice_prefix,
         payment_terms_days: String(business.payment_terms_days),
         payment_details: business.payment_details ?? '',
@@ -97,6 +99,26 @@ export default function BusinessSettings({ business, taxRates, canUpdate }: { bu
                                     disabled={!canUpdate || processing}
                                 />
                                 <InputError message={errors.proforma_prefix} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="creditnote_prefix">Credit note prefix</Label>
+                                <Input
+                                    id="creditnote_prefix"
+                                    value={data.creditnote_prefix}
+                                    onChange={(e) => setData('creditnote_prefix', e.target.value)}
+                                    disabled={!canUpdate || processing}
+                                />
+                                <InputError message={errors.creditnote_prefix} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="deliverynote_prefix">Delivery note prefix</Label>
+                                <Input
+                                    id="deliverynote_prefix"
+                                    value={data.deliverynote_prefix}
+                                    onChange={(e) => setData('deliverynote_prefix', e.target.value)}
+                                    disabled={!canUpdate || processing}
+                                />
+                                <InputError message={errors.deliverynote_prefix} />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="payment_terms_days">Payment terms (days)</Label>

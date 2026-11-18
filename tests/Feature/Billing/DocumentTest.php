@@ -245,7 +245,7 @@ class DocumentTest extends TestCase
         Client::factory()->create();
 
         $this->assertSame(
-            ['clients' => 2, 'estimates_this_month' => 1, 'invoices_this_month' => 2, 'proformas_this_month' => 0],
+            ['clients' => 2, 'estimates_this_month' => 1, 'invoices_this_month' => 2, 'proformas_this_month' => 0, 'deliverynotes_this_month' => 0],
             $this->user->currentBusiness->usage(),
         );
     }

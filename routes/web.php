@@ -68,13 +68,13 @@ Route::middleware(['auth', 'business'])->group(function () {
     Route::post('invoices/import/preview', [InvoiceImportController::class, 'preview'])->name('invoices.import.preview');
     Route::post('invoices/import', [InvoiceImportController::class, 'store'])->name('invoices.import.store');
 
-    // Estimates, invoices and pro-forma invoices share one controller; the "type" default tells it which.
+    // Every document type shares one controller; the "type" default tells it which.
     foreach (DocumentType::cases() as $type) {
         Route::prefix($type->plural())->name("{$type->plural()}.")->group(function () use ($type) {
             $routes = [
                 Route::get('/', [DocumentController::class, 'index'])->name('index'),
+                // Credit notes are made from their invoice, so "create" only points the way.
                 Route::get('create', [DocumentController::class, 'create'])->name('create'),
-                Route::post('/', [DocumentController::class, 'store'])->name('store'),
                 Route::get('{document}', [DocumentController::class, 'show'])->name('show'),
                 Route::get('{document}/edit', [DocumentController::class, 'edit'])->name('edit'),
                 Route::put('{document}', [DocumentController::class, 'update'])->name('update'),
@@ -84,6 +84,19 @@ Route::middleware(['auth', 'business'])->group(function () {
                 Route::post('{document}/send', [DocumentActionController::class, 'send'])->name('send'),
             ];
 
+            if (! $type->createdFromInvoice()) {
+                $routes[] = Route::post('/', [DocumentController::class, 'store'])->name('store');
+            }
+
+            if ($type->makesDeliveryNotes()) {
+                $routes[] = Route::post('{document}/delivery-note', [DocumentActionController::class, 'deliveryNote'])->name('delivery-note');
+            }
+
+            if ($type === DocumentType::CreditNote) {
+                $routes[] = Route::post('{document}/refund', [DocumentActionController::class, 'refund'])->name('refund.store');
+                $routes[] = Route::delete('{document}/refund', [DocumentActionController::class, 'destroyRefund'])->name('refund.destroy');
+            }
+
             if ($type->convertsToInvoice()) {
                 $routes[] = Route::post('{document}/convert', [DocumentActionController::class, 'convert'])->name('convert');
             }
@@ -91,6 +104,7 @@ Route::middleware(['auth', 'business'])->group(function () {
             if ($type === DocumentType::Invoice) {
                 $routes[] = Route::post('{document}/payments', [PaymentController::class, 'store'])->name('payments.store');
                 $routes[] = Route::delete('{document}/payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
+                $routes[] = Route::post('{document}/credit-note', [DocumentActionController::class, 'creditNote'])->name('credit-note');
                 $routes[] = Route::post('{document}/recurring', [RecurringInvoiceController::class, 'store'])->name('recurring.store');
             }
 

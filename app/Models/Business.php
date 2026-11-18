@@ -50,6 +50,8 @@ class Business extends Model
         'estimate_prefix',
         'invoice_prefix',
         'proforma_prefix',
+        'creditnote_prefix',
+        'deliverynote_prefix',
         'payment_terms_days',
         'payment_details',
         'send_reminders',
@@ -194,7 +196,7 @@ class Business extends Model
      *
      * Deleted clients and documents still count towards the month they were created in.
      *
-     * @return array{clients: int, estimates_this_month: int, invoices_this_month: int, proformas_this_month: int}
+     * @return array{clients: int, estimates_this_month: int, invoices_this_month: int, proformas_this_month: int, deliverynotes_this_month: int}
      */
     public function usage(): array
     {
@@ -210,6 +212,7 @@ class Business extends Model
             'estimates_this_month' => (int) ($documentsThisMonth[DocumentType::Estimate->value] ?? 0),
             'invoices_this_month' => (int) ($documentsThisMonth[DocumentType::Invoice->value] ?? 0),
             'proformas_this_month' => (int) ($documentsThisMonth[DocumentType::ProForma->value] ?? 0),
+            'deliverynotes_this_month' => (int) ($documentsThisMonth[DocumentType::DeliveryNote->value] ?? 0),
         ];
     }
 
@@ -257,6 +260,7 @@ class Business extends Model
             'invoices_per_month' => $usage['invoices_this_month'],
             'estimates_per_month' => $usage['estimates_this_month'],
             'proformas_per_month' => $usage['proformas_this_month'],
+            'deliverynotes_per_month' => $usage['deliverynotes_this_month'],
             'team_members' => $this->users()->count() + $this->invitations()->count(),
             'assistant_messages_per_month' => AssistantMessage::query()
                 ->withoutGlobalScopes()

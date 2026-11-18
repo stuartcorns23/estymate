@@ -361,6 +361,12 @@ export default function InvoiceDesign({
                                 <ToggleGroupItem value="estimate" className="px-3">
                                     Estimate
                                 </ToggleGroupItem>
+                                <ToggleGroupItem value="creditnote" className="px-3">
+                                    Credit note
+                                </ToggleGroupItem>
+                                <ToggleGroupItem value="deliverynote" className="px-3">
+                                    Delivery note
+                                </ToggleGroupItem>
                             </ToggleGroup>
                             <div className="flex items-center gap-2">
                                 {previewLoading && (

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\DocumentType;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -38,6 +39,8 @@ class DocumentRequest extends FormRequest
     public function rules(): array
     {
         $business = $this->user()->currentBusiness;
+        // Delivery notes have no prices, so their lines needn't have any.
+        $priced = DocumentType::from($this->route('type'))->showsPrices();
 
         return [
             'client_id' => [
@@ -49,6 +52,7 @@ class DocumentRequest extends FormRequest
             'reference' => ['nullable', 'string', 'max:255'],
             'po_number' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'delivery_address' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1', 'max:200'],
             'items.*.product_id' => [
                 'nullable',
@@ -57,9 +61,9 @@ class DocumentRequest extends FormRequest
             'items.*.description' => ['required', 'string', 'max:1000'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'max:1000000', 'decimal:0,2'],
             'items.*.unit' => ['nullable', 'string', 'max:30'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0', 'max:10000000', 'decimal:0,2'],
+            'items.*.unit_price' => [$priced ? 'required' : 'nullable', 'numeric', 'min:0', 'max:10000000', 'decimal:0,2'],
             'items.*.tax_rate' => [
-                'required',
+                $priced ? 'required' : 'nullable',
                 Rule::in($business->documentTaxRates()->pluck('rate')->map(fn ($rate) => (string) $rate)->all()),
             ],
         ];

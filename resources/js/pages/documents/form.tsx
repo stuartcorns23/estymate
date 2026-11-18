@@ -28,6 +28,7 @@ type DocumentFormData = {
     reference: string;
     po_number: string;
     notes: string;
+    delivery_address: string;
     items: LineItem[];
 };
 
@@ -54,6 +55,8 @@ interface DocumentFormProps {
         reference: string;
         po_number: string;
         notes: string;
+        delivery_address: string;
+        credits?: { number: string; label: string; url: string; total: number } | null;
         items: LineItem[];
     };
 }
@@ -69,7 +72,12 @@ function lineAmounts(item: LineItem) {
 }
 
 export default function DocumentForm({ type, clients, products, taxRates, document }: DocumentFormProps) {
-    const requestsPayment = type.value !== 'estimate';
+    const requestsPayment = type.requests_payment;
+    const showsPrices = type.shows_prices;
+    const isCreditNote = type.value === 'creditnote';
+    const isDeliveryNote = type.value === 'deliverynote';
+    // Delivery notes drop the price, VAT and amount columns.
+    const lineGrid = showsPrices ? 'md:grid-cols-[1fr_5rem_6rem_7rem_8rem_6rem_2.5rem]' : 'md:grid-cols-[1fr_6rem_8rem_2.5rem]';
     const label = type.label.toLowerCase();
     const defaultRate = taxRates.find((rate) => rate.is_default)?.rate ?? taxRates[0]?.rate ?? '0.00';
     const title = document.id ? `Edit ${label} ${document.number}` : `New ${label}`;
@@ -87,6 +95,7 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
         reference: document.reference,
         po_number: document.po_number,
         notes: document.notes,
+        delivery_address: document.delivery_address ?? '',
         items: document.items.length ? document.items.map((item) => ({ ...item, quantity: String(Number(item.quantity)) })) : [emptyLine()],
     });
 
@@ -153,6 +162,17 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
             <form onSubmit={submit} className="max-w-5xl space-y-8 p-4">
                 <PageHeader title={title} />
 
+                {isCreditNote && document.credits && (
+                    <p className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+                        This credits{' '}
+                        <Link href={document.credits.url} className="underline">
+                            invoice {document.credits.number}
+                        </Link>{' '}
+                        ({formatMoney(document.credits.total)}). Keep only the lines, quantities or prices you're crediting. Once issued, it comes off
+                        the invoice's balance and your income and VAT.
+                    </p>
+                )}
+
                 {clients.length === 0 && (
                     <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
                         You need a client first.{' '}
@@ -165,7 +185,7 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="grid gap-2 sm:col-span-2">
                         <Label htmlFor="client_id">Client</Label>
-                        <Select value={data.client_id} onValueChange={chooseClient}>
+                        <Select value={data.client_id} onValueChange={chooseClient} disabled={isCreditNote}>
                             <SelectTrigger id="client_id">
                                 <SelectValue placeholder="Choose a client" />
                             </SelectTrigger>
@@ -181,16 +201,18 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="issue_date">Date</Label>
+                        <Label htmlFor="issue_date">{isDeliveryNote ? 'Delivery date' : 'Date'}</Label>
                         <Input id="issue_date" type="date" required value={data.issue_date} onChange={(e) => setData('issue_date', e.target.value)} />
                         <InputError message={errors.issue_date} />
                     </div>
 
-                    <div className="grid gap-2">
-                        <Label htmlFor="due_date">{requestsPayment ? 'Due date' : 'Valid until'}</Label>
-                        <Input id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} />
-                        <InputError message={errors.due_date} />
-                    </div>
+                    {type.has_due_date && (
+                        <div className="grid gap-2">
+                            <Label htmlFor="due_date">{requestsPayment ? 'Due date' : 'Valid until'}</Label>
+                            <Input id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} />
+                            <InputError message={errors.due_date} />
+                        </div>
+                    )}
 
                     <div className="grid gap-2 sm:col-span-2">
                         <Label htmlFor="po_number">Client's PO number</Label>
@@ -208,6 +230,20 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                         />
                         <InputError message={errors.reference} />
                     </div>
+
+                    {isDeliveryNote && (
+                        <div className="grid gap-2 sm:col-span-2 lg:col-span-4">
+                            <Label htmlFor="delivery_address">Deliver to</Label>
+                            <Textarea
+                                id="delivery_address"
+                                rows={3}
+                                value={data.delivery_address}
+                                onChange={(e) => setData('delivery_address', e.target.value)}
+                                placeholder="Leave blank if it's the client's address"
+                            />
+                            <InputError message={errors.delivery_address} />
+                        </div>
+                    )}
                 </div>
 
                 <section className="space-y-3">
@@ -221,7 +257,7 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                                 <SelectContent>
                                     {products.map((product) => (
                                         <SelectItem key={product.id} value={String(product.id)}>
-                                            {product.name} · {formatMoney(toPence(product.unit_price))}
+                                            {showsPrices ? `${product.name} · ${formatMoney(toPence(product.unit_price))}` : product.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -231,21 +267,22 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                     <InputError message={errors.items} />
 
                     <div className="space-y-3">
-                        <div className="text-muted-foreground hidden grid-cols-[1fr_5rem_6rem_7rem_8rem_6rem_2.5rem] gap-2 px-1 text-xs font-medium md:grid">
+                        <div className={`text-muted-foreground hidden gap-2 px-1 text-xs font-medium md:grid ${lineGrid}`}>
                             <span>Description</span>
                             <span>Qty</span>
                             <span>Unit</span>
-                            <span>Price (£)</span>
-                            <span>VAT</span>
-                            <span className="text-right">Amount</span>
+                            {showsPrices && (
+                                <>
+                                    <span>Price (£)</span>
+                                    <span>VAT</span>
+                                    <span className="text-right">Amount</span>
+                                </>
+                            )}
                             <span />
                         </div>
 
                         {data.items.map((item, index) => (
-                            <div
-                                key={index}
-                                className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_5rem_6rem_7rem_8rem_6rem_2.5rem] md:items-start md:border-0 md:p-0"
-                            >
+                            <div key={index} className={`grid gap-2 rounded-lg border p-3 md:items-start md:border-0 md:p-0 ${lineGrid}`}>
                                 <div>
                                     <Textarea
                                         aria-label="Description"
@@ -253,7 +290,7 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                                         className="min-h-10"
                                         value={item.description}
                                         onChange={(e) => updateLine(index, { description: e.target.value })}
-                                        placeholder="What you're charging for"
+                                        placeholder={showsPrices ? "What you're charging for" : "What you're delivering"}
                                     />
                                     <InputError message={errorFor(`items.${index}.description`)} />
                                 </div>
@@ -272,32 +309,38 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                                     onChange={(e) => updateLine(index, { unit: e.target.value })}
                                     placeholder="hours"
                                 />
-                                <div>
-                                    <Input
-                                        aria-label="Unit price"
-                                        inputMode="decimal"
-                                        value={item.unit_price}
-                                        onChange={(e) => updateLine(index, { unit_price: e.target.value })}
-                                        placeholder="0.00"
-                                    />
-                                    <InputError message={errorFor(`items.${index}.unit_price`)} />
-                                </div>
-                                <div>
-                                    <Select value={item.tax_rate} onValueChange={(value) => updateLine(index, { tax_rate: value })}>
-                                        <SelectTrigger aria-label="VAT rate">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {taxRates.map((rate) => (
-                                                <SelectItem key={rate.id} value={rate.rate}>
-                                                    {formatRate(rate.rate)}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <InputError message={errorFor(`items.${index}.tax_rate`)} />
-                                </div>
-                                <div className="flex h-10 items-center justify-end text-sm tabular-nums">{formatMoney(lineAmounts(item).net)}</div>
+                                {showsPrices && (
+                                    <>
+                                        <div>
+                                            <Input
+                                                aria-label="Unit price"
+                                                inputMode="decimal"
+                                                value={item.unit_price}
+                                                onChange={(e) => updateLine(index, { unit_price: e.target.value })}
+                                                placeholder="0.00"
+                                            />
+                                            <InputError message={errorFor(`items.${index}.unit_price`)} />
+                                        </div>
+                                        <div>
+                                            <Select value={item.tax_rate} onValueChange={(value) => updateLine(index, { tax_rate: value })}>
+                                                <SelectTrigger aria-label="VAT rate">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {taxRates.map((rate) => (
+                                                        <SelectItem key={rate.id} value={rate.rate}>
+                                                            {formatRate(rate.rate)}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <InputError message={errorFor(`items.${index}.tax_rate`)} />
+                                        </div>
+                                        <div className="flex h-10 items-center justify-end text-sm tabular-nums">
+                                            {formatMoney(lineAmounts(item).net)}
+                                        </div>
+                                    </>
+                                )}
                                 <Button
                                     type="button"
                                     variant="ghost"
@@ -321,14 +364,16 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                         <Plus /> Add line
                     </Button>
 
-                    <dl className="ml-auto grid w-full max-w-xs grid-cols-2 gap-y-1 pt-4 text-sm">
-                        <dt className="text-muted-foreground">Subtotal</dt>
-                        <dd className="text-right tabular-nums">{formatMoney(totals.net)}</dd>
-                        <dt className="text-muted-foreground">VAT</dt>
-                        <dd className="text-right tabular-nums">{formatMoney(totals.tax)}</dd>
-                        <dt className="border-t pt-2 font-semibold">Total</dt>
-                        <dd className="border-t pt-2 text-right font-semibold tabular-nums">{formatMoney(totals.net + totals.tax)}</dd>
-                    </dl>
+                    {showsPrices && (
+                        <dl className="ml-auto grid w-full max-w-xs grid-cols-2 gap-y-1 pt-4 text-sm">
+                            <dt className="text-muted-foreground">Subtotal</dt>
+                            <dd className="text-right tabular-nums">{formatMoney(totals.net)}</dd>
+                            <dt className="text-muted-foreground">VAT</dt>
+                            <dd className="text-right tabular-nums">{formatMoney(totals.tax)}</dd>
+                            <dt className="border-t pt-2 font-semibold">{isCreditNote ? 'Total credit' : 'Total'}</dt>
+                            <dd className="border-t pt-2 text-right font-semibold tabular-nums">{formatMoney(totals.net + totals.tax)}</dd>
+                        </dl>
+                    )}
                 </section>
 
                 <div className="grid gap-2">
@@ -338,7 +383,15 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                         rows={4}
                         value={data.notes}
                         onChange={(e) => setData('notes', e.target.value)}
-                        placeholder={requestsPayment ? 'Payment details, thank-you note' : 'Scope, terms or anything the client should know'}
+                        placeholder={
+                            requestsPayment
+                                ? 'Payment details, thank-you note'
+                                : isCreditNote
+                                  ? 'Why the invoice is being credited'
+                                  : isDeliveryNote
+                                    ? 'Delivery instructions, parcel or tracking numbers'
+                                    : 'Scope, terms or anything the client should know'
+                        }
                     />
                     <InputError message={errors.notes} />
                 </div>
