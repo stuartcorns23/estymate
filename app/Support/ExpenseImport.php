@@ -51,7 +51,7 @@ class ExpenseImport
     private const ALIASES = [
         'supplier' => ['supplier', 'suppliername', 'vendor', 'vendorname', 'payee', 'merchant', 'company', 'companyname', 'from', 'seller', 'shop', 'store', 'client', 'partner', 'businessname'],
         'reference' => ['reference', 'ref', 'expensenumber', 'number', 'documentnumber', 'invoicenumber', 'invoiceno', 'billnumber', 'receiptnumber', 'receiptno', 'variablesymbol', 'supplierreference', 'suppliersinvoicenumber'],
-        'date' => ['issuedate', 'date', 'expensedate', 'invoicedate', 'receiptdate', 'billdate', 'dateissued', 'transactiondate', 'purchasedate'],
+        'date' => ['issuedate', 'created', 'createdon', 'datecreated', 'date', 'expensedate', 'invoicedate', 'receiptdate', 'billdate', 'dateissued', 'transactiondate', 'purchasedate'],
         'category' => ['category', 'expensecategory', 'type', 'expensetype', 'account', 'nominal', 'nominalcode', 'tag', 'tags'],
         'description' => ['description', 'item', 'items', 'name', 'title', 'subject', 'details', 'detail', 'expense', 'what', 'memo'],
         'total' => ['total', 'totalamount', 'amount', 'gross', 'grossamount', 'totalincvat', 'totalincludingvat', 'amountincvat', 'totalwithvat', 'grandtotal', 'sum', 'price'],
@@ -61,7 +61,7 @@ class ExpenseImport
         'currency' => ['currency', 'currencycode'],
         'paid_on' => ['paymentdate', 'paidon', 'datepaid', 'paiddate', 'paymentdates'],
         'paid' => ['paid', 'status', 'paymentstatus', 'ispaid'],
-        'notes' => ['note', 'notes', 'comment', 'comments', 'duedate', 'paymentmethod', 'paymentreference', 'paymentnote', 'ordernumber', 'vatregno', 'sumofpayment'],
+        'notes' => ['note', 'notes', 'comment', 'comments', 'duedate', 'paymentmethod', 'paymentreference', 'paymentnote', 'ordernumber', 'vatregno', 'sumofpayment', 'business'],
     ];
 
     /**
@@ -84,6 +84,28 @@ class ExpenseImport
         'equipment' => ['equipment', 'hardware', 'computer', 'laptop', 'tools', 'machinery', 'furniture', 'asset', 'printer'],
         'office' => ['office', 'phone', 'telephone', 'mobile', 'broadband', 'internet', 'stationery', 'postage', 'post', 'courier', 'delivery'],
         'materials' => ['material*', 'stock', 'goods', 'supplies', 'purchase', 'resale', 'parts', 'cost of sales'],
+    ];
+
+    /**
+     * Billdu's expense categories, where keywords alone would guess wrong.
+     */
+    private const KNOWN_CATEGORIES = [
+        'licensespermits' => 'software',
+        'webhosting' => 'software',
+        'productsmaterials' => 'materials',
+        'print' => 'materials',
+        'booksandprint' => 'materials',
+        'officesupplies' => 'office',
+        'administration' => 'office',
+        'postage' => 'office',
+        'cellphone' => 'office',
+        'hardware' => 'equipment',
+        'repairs' => 'equipment',
+        'maintenance' => 'equipment',
+        'accounting' => 'professional',
+        'courses' => 'training',
+        'companies' => 'other',
+        'other' => 'other',
     ];
 
     private const CURRENCY_SYMBOLS = ['£' => 'GBP', '€' => 'EUR', '$' => 'USD'];
@@ -109,7 +131,13 @@ class ExpenseImport
     {
         $headers = array_map(self::normalise(...), $this->headers);
 
-        // Billdu's exports share headings like these across invoices and expenses.
+        // Billdu's expense export: Category, Name, Business, VAT Reg. No., Created, Due date,
+        // Reference, Currency, Paid, Total.
+        if (array_diff(['category', 'name', 'business', 'created', 'paid', 'total'], $headers) === []) {
+            return 'Billdu';
+        }
+
+        // Billdu's other document exports share headings like these.
         $billdu = array_intersect($headers, ['documenttype', 'createdby', 'sumofpayment', 'vatregno', 'issuedate']);
 
         return count($billdu) >= 2 ? 'Billdu' : null;
@@ -141,12 +169,20 @@ class ExpenseImport
         // Billdu has a number column and a separate free-text "Reference" (e.g. "Printing order"),
         // so when there's a number, the reference text is the description.
         $hasNumber = array_intersect($keys, ['expensenumber', 'invoicenumber', 'documentnumber', 'number', 'billnumber', 'receiptnumber']) !== [];
+        $hasSupplier = collect($keys)->contains(fn ($key) => in_array($key, self::ALIASES['supplier'], true));
 
         foreach ($keys as $key) {
             $field = collect(self::ALIASES)->search(fn ($aliases) => in_array($key, $aliases, true));
 
             if ($key === 'reference' && $hasNumber) {
                 $field = 'description';
+            }
+
+            // In Billdu's expense export, "Name" is who the expense is from (often with an order
+            // number after a dash) and "Business" is usually the client it was bought for, so
+            // that goes in the notes. Elsewhere a lone "Name" column is the supplier.
+            if ($key === 'name' && ! $hasSupplier) {
+                $field = 'supplier';
             }
 
             // Only the first column is guessed for each field (except notes), so a second
@@ -162,7 +198,7 @@ class ExpenseImport
     }
 
     /**
-     * Check every row against the mapping, the business's expenses and the rows above it.
+     * Check every row against the mapping and the business's expenses.
      *
      * Each row is "ready", "warning" (will import, with changes explained), "duplicate"
      * (left unticked to begin with) or "invalid" (can't be imported).
@@ -173,15 +209,11 @@ class ExpenseImport
      */
     public function analyse(array $mapping, Collection $existing, string $defaultCurrency): array
     {
-        $known = [];
-
-        foreach ($existing as $expense) {
-            $known[self::duplicateKey($expense->supplier, $expense->date->format('Y-m-d'), (int) $expense->total)] = 'an expense you already have';
-
-            if ($expense->reference) {
-                $known[self::referenceKey($expense->supplier, $expense->reference)] = 'an expense you already have';
-            }
-        }
+        // Only expenses already saved count as duplicates. Rows in the same file are separate
+        // records (Billdu exports often have two identical orders on one day).
+        $known = $existing
+            ->groupBy(fn (Expense $expense) => self::duplicateKey($expense->supplier, $expense->date->format('Y-m-d'), (int) $expense->total))
+            ->map(fn ($expenses) => $expenses->map(fn (Expense $expense) => $expense->reference ? Str::lower(trim($expense->reference)) : null)->all());
 
         $results = [];
 
@@ -196,23 +228,13 @@ class ExpenseImport
             }
 
             $status = $messages === [] ? 'ready' : 'warning';
-            $keys = [self::duplicateKey($attributes['supplier'], $attributes['date'], $attributes['total'])];
+            $references = $known->get(self::duplicateKey($attributes['supplier'], $attributes['date'], $attributes['total']), []);
+            $reference = $attributes['reference'] ? Str::lower(trim($attributes['reference'])) : null;
 
-            if ($attributes['reference'] ?? null) {
-                $keys[] = self::referenceKey($attributes['supplier'], $attributes['reference']);
-            }
-
-            foreach ($keys as $key) {
-                if (isset($known[$key])) {
-                    $status = 'duplicate';
-                    array_unshift($messages, "Looks like {$known[$key]}.");
-
-                    break;
-                }
-            }
-
-            foreach ($keys as $key) {
-                $known[$key] ??= "a repeat of row {$row}";
+            // Same supplier, date and total, and the references don't disagree.
+            if ($references !== [] && ($reference === null || in_array(null, $references, true) || in_array($reference, $references, true))) {
+                $status = 'duplicate';
+                array_unshift($messages, 'Looks like an expense you already have.');
             }
 
             $results[] = ['row' => $row, 'status' => $status, 'attributes' => $attributes, 'messages' => $messages];
@@ -256,6 +278,21 @@ class ExpenseImport
             'reference' => isset($values['reference']) ? Str::limit($values['reference'], 100, '') : null,
             'description' => isset($values['description']) ? Str::limit($values['description'], 255, '') : null,
         ];
+
+        // "Pencarrie - DEYN122501" or "Kenable - Cables for a client": the supplier, then details.
+        // A detail that looks like an order number ("DEYN122501") is the reference instead.
+        if ($attributes['description'] === null && preg_match('/^(.+?)\s+-\s+(.+)$/u', $attributes['supplier'], $m)) {
+            $attributes['supplier'] = $m[1];
+            $detail = $m[2];
+
+            if (! str_contains($detail, ' ') && preg_match('/\d/', $detail)) {
+                $attributes['reference'] ??= Str::limit($detail, 100, '');
+            }
+
+            if (Str::lower($detail) !== Str::lower($attributes['reference'] ?? '')) {
+                $attributes['description'] = Str::limit($detail, 255, '');
+            }
+        }
 
         if ($attributes['supplier'] === '') {
             return [$attributes, [], 'There is no supplier.'];
@@ -318,7 +355,7 @@ class ExpenseImport
         if (isset($values['category']) && ! $exact) {
             $notes[] = "Category in file: {$values['category']}";
 
-            if ($category === ExpenseCategory::Other) {
+            if ($category === ExpenseCategory::Other && ! isset(self::KNOWN_CATEGORIES[self::normalise($values['category'])])) {
                 $messages[] = "\"{$values['category']}\" doesn't match one of our categories, so it's set to Other.";
             }
         }
@@ -328,7 +365,7 @@ class ExpenseImport
         $attributes['currency'] = $currency ?? $defaultCurrency;
 
         if ($currency !== null && $currency !== $defaultCurrency) {
-            $messages[] = "This expense is in {$currency}, not {$defaultCurrency}, so it isn't counted in your totals the same way.";
+            $messages[] = "This expense is in {$currency}. The amount is kept in {$currency}, not converted to {$defaultCurrency}.";
         }
 
         // Paid. Billdu puts several payments in one cell, separated by semicolons; the last one settles it.
@@ -372,6 +409,10 @@ class ExpenseImport
                 if ($key === self::normalise($case->value) || $key === self::normalise($case->label())) {
                     return [$case, true];
                 }
+            }
+
+            if (isset(self::KNOWN_CATEGORIES[$key])) {
+                return [ExpenseCategory::from(self::KNOWN_CATEGORIES[$key]), false];
             }
 
             return [self::categoryFromWords($text) ?? ExpenseCategory::Other, false];
@@ -440,11 +481,6 @@ class ExpenseImport
     private static function duplicateKey(string $supplier, string $date, int $total): string
     {
         return ClientImport::nameKey($supplier)."|{$date}|{$total}";
-    }
-
-    private static function referenceKey(string $supplier, string $reference): string
-    {
-        return ClientImport::nameKey($supplier).'|ref|'.Str::lower(trim($reference));
     }
 
     private static function clean(string $value): string

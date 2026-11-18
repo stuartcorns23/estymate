@@ -14,18 +14,21 @@ class ExpenseImportTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * A made-up export laid out like Billdu's document exports.
+     * A made-up export in the layout of Billdu's real expense export.
      */
     private function billduCsv(): string
     {
         return "\xEF\xBB\xBF".implode("\r\n", [
-            '"Document type","Invoice number","Reference","Supplier","# VAT Reg. No.","Category","Issue date","Due date","Total","Currency","Payment date","Sum of payment","Payment method","Note","Created by"',
-            '"Expense","INV-881","Printer paper","Viking Direct","GB111","Office supplies","30/10/2025","13/11/2025","59.99","GBP","2025-10-30","59,99","Transfer","","Tandonta"',
-            '"Expense","F-12","Fuel","Shell","","","02/11/2025","","45.00","GBP","","","","","Tandonta"',
-            '"Expense","A1","Web hosting","Some Host Ltd","","Hosting & Domains","05/11/2025","","120.00","GBP","2025-11-05;2025-11-20","60,00;60,00","Card","Two payments","Tandonta"',
-            '"Expense","","","","","","05/11/2025","","10.00","GBP","","","","",""',
-            '"Expense","X","Mystery","Somebody","","Miscellaneous stuff","not a date","","10.00","GBP","","","","",""',
-            '"Expense","Z9","Odd thing","Odd Co","","Weird category","06/11/2025","","12.50","EUR","","","","",""',
+            '"Category","Name","Business","VAT Reg. No.","Created","Due date","Reference","Currency","Paid","Total"',
+            '"Office Supplies","Kenable - Cables for a client","Bright Signs Ltd","","24/03/2026","","002105659","GBP","Yes","24.18"',
+            '"Licenses, permits","Web Host Co","","","01/01/2026","","SUB-1","USD","Yes","17.00"',
+            '"Licenses, permits","Web Host Co","","","01/12/2025","","SUB-1","USD","Yes","17.00"',
+            '"Print","Solopress - 4717416","","","05/11/2025","","","GBP","Yes","45.00"',
+            '"","","","","05/11/2025","","","GBP","Yes","10.00"',
+            '"Mystery things","Somebody","","","not a date","","","GBP","Yes","10.00"',
+            '"Weird category","Odd Co","","","06/11/2025","","","GBP","Yes","12.50"',
+            '"Accounting","Premium","","","07/11/2025","","","GBP","Yes","12.00"',
+            '"Accounting","Premium","","","07/11/2025","","","GBP","Yes","12.00"',
         ]);
     }
 
@@ -53,8 +56,7 @@ class ExpenseImportTest extends TestCase
 
         $response->assertJsonPath('format', 'Billdu');
         $response->assertJsonPath('mapping', [
-            null, 'reference', 'description', 'supplier', 'notes', 'category', 'date', 'notes',
-            'total', 'currency', 'paid_on', 'notes', 'notes', 'notes', null,
+            'category', 'supplier', 'notes', 'notes', 'date', 'notes', 'reference', 'currency', 'paid', 'total',
         ]);
     }
 
@@ -63,32 +65,42 @@ class ExpenseImportTest extends TestCase
         $this->user();
         $rows = collect($this->postJson('/expenses/import/preview', ['csv' => $this->billduCsv()])->json('rows'))->keyBy('row');
 
+        // The name is split into supplier and details; "Business" is the client, kept in the notes.
         $this->assertSame('ready', $rows[2]['status']);
-        $this->assertSame('Viking Direct', $rows[2]['attributes']['supplier']);
-        $this->assertSame('INV-881', $rows[2]['attributes']['reference']);
-        $this->assertSame('Printer paper', $rows[2]['attributes']['description']);
-        $this->assertSame('2025-10-30', $rows[2]['attributes']['date']);
-        $this->assertSame(5999, $rows[2]['attributes']['total']);
+        $this->assertSame('Kenable', $rows[2]['attributes']['supplier']);
+        $this->assertSame('Cables for a client', $rows[2]['attributes']['description']);
+        $this->assertSame('002105659', $rows[2]['attributes']['reference']);
+        $this->assertSame('2026-03-24', $rows[2]['attributes']['date']);
+        $this->assertSame(2418, $rows[2]['attributes']['total']);
         $this->assertSame('office', $rows[2]['attributes']['category']);
-        $this->assertSame('2025-10-30', $rows[2]['attributes']['paid_on']);
-        $this->assertStringContainsString('Category in file: Office supplies', $rows[2]['attributes']['notes']);
+        $this->assertSame('2026-03-24', $rows[2]['attributes']['paid_on']);
+        $this->assertStringContainsString('Business: Bright Signs Ltd', $rows[2]['attributes']['notes']);
+        $this->assertStringContainsString('Category in file: Office Supplies', $rows[2]['attributes']['notes']);
 
-        // No category: guessed from the description; no payment means unpaid.
-        $this->assertSame('vehicle', $rows[3]['attributes']['category']);
-        $this->assertNull($rows[3]['attributes']['paid_on']);
+        // A monthly subscription with the same reference each month isn't a duplicate.
+        $this->assertSame('software', $rows[3]['attributes']['category']);
+        $this->assertSame('USD', $rows[3]['attributes']['currency']);
+        $this->assertSame('warning', $rows[3]['status']);
+        $this->assertSame('warning', $rows[4]['status']);
 
-        // Several payments: the last one is the date paid.
-        $this->assertSame('software', $rows[4]['attributes']['category']);
-        $this->assertSame('2025-11-20', $rows[4]['attributes']['paid_on']);
+        $this->assertSame('materials', $rows[5]['attributes']['category']);
+        $this->assertSame('Solopress', $rows[5]['attributes']['supplier']);
+        // An order number after the dash becomes the reference, not a description too.
+        $this->assertSame('4717416', $rows[5]['attributes']['reference']);
+        $this->assertNull($rows[5]['attributes']['description']);
 
-        $this->assertSame('invalid', $rows[5]['status']);
-        $this->assertSame(['There is no supplier.'], $rows[5]['messages']);
         $this->assertSame('invalid', $rows[6]['status']);
+        $this->assertSame(['There is no supplier.'], $rows[6]['messages']);
+        $this->assertSame('invalid', $rows[7]['status']);
 
-        // An unknown category becomes Other, with a warning; a foreign currency is kept.
-        $this->assertSame('warning', $rows[7]['status']);
-        $this->assertSame('other', $rows[7]['attributes']['category']);
-        $this->assertSame('EUR', $rows[7]['attributes']['currency']);
+        // An unknown category becomes Other, with a warning.
+        $this->assertSame('warning', $rows[8]['status']);
+        $this->assertSame('other', $rows[8]['attributes']['category']);
+
+        // Two identical rows in one file are both kept.
+        $this->assertSame('professional', $rows[9]['attributes']['category']);
+        $this->assertSame('ready', $rows[9]['status']);
+        $this->assertSame('ready', $rows[10]['status']);
     }
 
     public function test_generic_files_work_out_vat_and_paid_status()
@@ -138,13 +150,17 @@ class ExpenseImportTest extends TestCase
     {
         $user = $this->user();
         Expense::factory()->for($user->currentBusiness)->create([
-            'supplier' => 'Viking Direct Ltd', 'date' => '2025-10-30', 'total' => 5999,
+            'supplier' => 'Kenable Ltd', 'date' => '2026-03-24', 'total' => 2418, 'reference' => null,
+        ]);
+        Expense::factory()->for($user->currentBusiness)->create([
+            'supplier' => 'Web Host Co', 'date' => '2026-01-01', 'total' => 1700, 'reference' => 'OTHER',
         ]);
 
         $rows = collect($this->postJson('/expenses/import/preview', ['csv' => $this->billduCsv()])->json('rows'))->keyBy('row');
 
         $this->assertSame('duplicate', $rows[2]['status']);
-        $this->assertSame('ready', $rows[3]['status']);
+        // Same supplier, date and total but a different reference.
+        $this->assertSame('warning', $rows[3]['status']);
     }
 
     public function test_other_businesses_expenses_are_not_duplicates()
@@ -152,7 +168,7 @@ class ExpenseImportTest extends TestCase
         $this->user();
         $other = User::factory()->withBusiness()->create();
         Expense::factory()->for($other->currentBusiness)->create([
-            'supplier' => 'Viking Direct', 'date' => '2025-10-30', 'total' => 5999,
+            'supplier' => 'Kenable', 'date' => '2026-03-24', 'total' => 2418,
         ]);
 
         $rows = collect($this->postJson('/expenses/import/preview', ['csv' => $this->billduCsv()])->json('rows'))->keyBy('row');
