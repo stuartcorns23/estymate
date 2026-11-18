@@ -13,11 +13,19 @@ class SaveDocument
     /**
      * Create or update a document with its line items and totals.
      *
-     * @param  array{client_id: int, issue_date: string, due_date?: ?string, reference?: ?string, po_number?: ?string, notes?: ?string, items: list<array{product_id?: ?int, description: string, quantity: string|float, unit?: ?string, unit_price: string|float, tax_rate: string|float}>}  $data
+     * @param  array{client_id: int, issue_date: string, due_date?: ?string, reference?: ?string, po_number?: ?string, notes?: ?string, delivery_address?: ?string, items: list<array{product_id?: ?int, description: string, quantity: string|float, unit?: ?string, unit_price: string|float, tax_rate: string|float}>}  $data
      */
     public function handle(Document $document, DocumentType $type, array $data): Document
     {
         return DB::transaction(function () use ($document, $type, $data) {
+            if (! $type->hasDueDate()) {
+                $data['due_date'] = null;
+            }
+
+            if ($type !== DocumentType::DeliveryNote) {
+                $data['delivery_address'] = null;
+            }
+
             $document->fill($data);
 
             if (! $document->exists) {
@@ -33,7 +41,8 @@ class SaveDocument
             $document->items()->delete();
 
             foreach (array_values($data['items']) as $position => $item) {
-                $unitPrice = Money::toPence($item['unit_price']);
+                $unitPrice = Money::toPence($item['unit_price'] ?? 0);
+                $item['tax_rate'] ??= '0.00';
 
                 $document->items()->create([
                     'product_id' => $item['product_id'] ?? null,

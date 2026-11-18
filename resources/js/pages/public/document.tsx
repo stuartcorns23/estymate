@@ -11,6 +11,10 @@ interface PublicDocumentProps {
         type: string;
         requests_payment: boolean;
         is_pro_forma: boolean;
+        shows_prices: boolean;
+        credits_invoice: string | null;
+        delivery_address: string | null;
+        amount_credited: number;
         number: string;
         status: DocumentStatus;
         is_overdue: boolean;
@@ -24,7 +28,15 @@ interface PublicDocumentProps {
         amount_paid: number;
         balance_due: number | null;
         notes: string | null;
-        items: { id: number; description: string; quantity: string; unit: string | null; unit_price: number; tax_rate: string; net_amount: number }[];
+        items: {
+            id: number;
+            description: string;
+            quantity: string;
+            unit: string | null;
+            unit_price?: number;
+            tax_rate?: string;
+            net_amount?: number;
+        }[];
         business: { name: string; email: string | null; phone: string | null };
         client_name: string;
         can_pay: boolean;
@@ -38,6 +50,7 @@ export default function PublicDocument({ document, justPaid }: PublicDocumentPro
     const [paying, setPaying] = useState(false);
     const money = (pence: number) => formatMoney(pence, document.currency);
     const requestsPayment = document.requests_payment;
+    const showsPrices = document.shows_prices;
 
     const pay = () => {
         setPaying(true);
@@ -77,6 +90,12 @@ export default function PublicDocument({ document, justPaid }: PublicDocumentPro
                         </div>
                     )}
 
+                    {document.credits_invoice && (
+                        <p className="text-muted-foreground rounded-lg border p-4 text-sm">
+                            This credit note cancels {money(document.total)} of invoice {document.credits_invoice}.
+                        </p>
+                    )}
+
                     {document.is_pro_forma && (
                         <p className="text-muted-foreground rounded-lg border p-4 text-sm">
                             This is a pro-forma invoice, not a VAT invoice. A full invoice will be issued once payment is received.
@@ -87,9 +106,15 @@ export default function PublicDocument({ document, justPaid }: PublicDocumentPro
                         <div className="flex flex-wrap justify-between gap-6 text-sm">
                             <div>
                                 <p className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">
-                                    {requestsPayment ? 'Bill to' : 'Prepared for'}
+                                    {requestsPayment || document.credits_invoice ? 'Bill to' : showsPrices ? 'Prepared for' : 'Customer'}
                                 </p>
                                 <p className="font-medium">{document.client_name}</p>
+                                {document.delivery_address && (
+                                    <>
+                                        <p className="text-muted-foreground mt-4 mb-1 text-xs tracking-wide uppercase">Deliver to</p>
+                                        <p className="whitespace-pre-line">{document.delivery_address}</p>
+                                    </>
+                                )}
                             </div>
                             <dl className="grid grid-cols-2 gap-x-6 gap-y-1">
                                 <dt className="text-muted-foreground">Date</dt>
@@ -119,9 +144,13 @@ export default function PublicDocument({ document, justPaid }: PublicDocumentPro
                                     <tr>
                                         <th className="py-2 pr-4 font-medium">Description</th>
                                         <th className="py-2 pr-4 text-right font-medium">Qty</th>
-                                        <th className="hidden py-2 pr-4 text-right font-medium sm:table-cell">Price</th>
-                                        <th className="hidden py-2 pr-4 text-right font-medium sm:table-cell">VAT</th>
-                                        <th className="py-2 text-right font-medium">Amount</th>
+                                        {showsPrices && (
+                                            <>
+                                                <th className="hidden py-2 pr-4 text-right font-medium sm:table-cell">Price</th>
+                                                <th className="hidden py-2 pr-4 text-right font-medium sm:table-cell">VAT</th>
+                                                <th className="py-2 text-right font-medium">Amount</th>
+                                            </>
+                                        )}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
@@ -131,31 +160,51 @@ export default function PublicDocument({ document, justPaid }: PublicDocumentPro
                                             <td className="py-3 pr-4 text-right whitespace-nowrap tabular-nums">
                                                 {Number(item.quantity)} {item.unit}
                                             </td>
-                                            <td className="hidden py-3 pr-4 text-right tabular-nums sm:table-cell">{money(item.unit_price)}</td>
-                                            <td className="hidden py-3 pr-4 text-right tabular-nums sm:table-cell">{formatRate(item.tax_rate)}</td>
-                                            <td className="py-3 text-right tabular-nums">{money(item.net_amount)}</td>
+                                            {showsPrices && (
+                                                <>
+                                                    <td className="hidden py-3 pr-4 text-right tabular-nums sm:table-cell">
+                                                        {money(item.unit_price ?? 0)}
+                                                    </td>
+                                                    <td className="hidden py-3 pr-4 text-right tabular-nums sm:table-cell">
+                                                        {formatRate(item.tax_rate ?? '0')}
+                                                    </td>
+                                                    <td className="py-3 text-right tabular-nums">{money(item.net_amount ?? 0)}</td>
+                                                </>
+                                            )}
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
 
-                        <dl className="ml-auto grid w-full max-w-xs grid-cols-2 gap-y-1 text-sm">
-                            <dt className="text-muted-foreground">Subtotal</dt>
-                            <dd className="text-right tabular-nums">{money(document.subtotal)}</dd>
-                            <dt className="text-muted-foreground">VAT</dt>
-                            <dd className="text-right tabular-nums">{money(document.tax_total)}</dd>
-                            <dt className="border-t pt-2 font-semibold">Total</dt>
-                            <dd className="border-t pt-2 text-right font-semibold tabular-nums">{money(document.total)}</dd>
-                            {document.amount_paid > 0 && document.balance_due !== null && (
-                                <>
-                                    <dt className="text-muted-foreground">Paid</dt>
-                                    <dd className="text-right tabular-nums">−{money(document.amount_paid)}</dd>
-                                    <dt className="font-semibold">Balance due</dt>
-                                    <dd className="text-right font-semibold tabular-nums">{money(document.balance_due)}</dd>
-                                </>
-                            )}
-                        </dl>
+                        {showsPrices && (
+                            <dl className="ml-auto grid w-full max-w-xs grid-cols-2 gap-y-1 text-sm">
+                                <dt className="text-muted-foreground">Subtotal</dt>
+                                <dd className="text-right tabular-nums">{money(document.subtotal)}</dd>
+                                <dt className="text-muted-foreground">VAT</dt>
+                                <dd className="text-right tabular-nums">{money(document.tax_total)}</dd>
+                                <dt className="border-t pt-2 font-semibold">Total</dt>
+                                <dd className="border-t pt-2 text-right font-semibold tabular-nums">{money(document.total)}</dd>
+                                {(document.amount_paid > 0 || document.amount_credited > 0) && document.balance_due !== null && (
+                                    <>
+                                        {document.amount_paid > 0 && (
+                                            <>
+                                                <dt className="text-muted-foreground">Paid</dt>
+                                                <dd className="text-right tabular-nums">−{money(document.amount_paid)}</dd>
+                                            </>
+                                        )}
+                                        {document.amount_credited > 0 && (
+                                            <>
+                                                <dt className="text-muted-foreground">Credited</dt>
+                                                <dd className="text-right tabular-nums">−{money(document.amount_credited)}</dd>
+                                            </>
+                                        )}
+                                        <dt className="font-semibold">Balance due</dt>
+                                        <dd className="text-right font-semibold tabular-nums">{money(document.balance_due)}</dd>
+                                    </>
+                                )}
+                            </dl>
+                        )}
 
                         {document.notes && <p className="text-muted-foreground text-sm whitespace-pre-line">{document.notes}</p>}
                     </div>

@@ -24,7 +24,7 @@ class DocumentPdf
      */
     public static function html(Document $document, ?DocumentDesign $design = null, bool $preview = false): string
     {
-        $document->loadMissing(['business', 'client', 'items']);
+        $document->loadMissing(['business', 'client', 'items', 'source']);
 
         $design ??= DocumentDesign::forBusiness($document->business);
 
@@ -40,6 +40,11 @@ class DocumentPdf
             'isProForma' => $document->type === DocumentType::ProForma,
             // Invoices and pro-formas ask for payment by a due date; estimates are valid until one.
             'requestsPayment' => $document->type->requestsPayment(),
+            'isCreditNote' => $document->type === DocumentType::CreditNote,
+            'isDeliveryNote' => $document->type === DocumentType::DeliveryNote,
+            'showsPrices' => $document->type->showsPrices(),
+            // The invoice a credit note credits, which UK credit notes must name.
+            'creditedInvoice' => $document->type === DocumentType::CreditNote ? $document->source : null,
             'money' => fn (int $pence) => Money::format($pence, $document->currency),
             'number' => fn ($value) => rtrim(rtrim((string) $value, '0'), '.'),
             'businessAddress' => array_values(array_filter([

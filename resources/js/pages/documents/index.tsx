@@ -26,6 +26,7 @@ const statusFilters: Record<DocumentTypeInfo['value'], { value: string; label: s
         { value: 'sent', label: 'Unpaid' },
         { value: 'overdue', label: 'Overdue' },
         { value: 'paid', label: 'Paid' },
+        { value: 'credited', label: 'Credited' },
         { value: 'void', label: 'Void' },
     ],
     proforma: [
@@ -34,6 +35,18 @@ const statusFilters: Record<DocumentTypeInfo['value'], { value: string; label: s
         { value: 'sent', label: 'Awaiting payment' },
         { value: 'invoiced', label: 'Invoiced' },
         { value: 'void', label: 'Void' },
+    ],
+    creditnote: [
+        { value: '', label: 'All' },
+        { value: 'draft', label: 'Draft' },
+        { value: 'sent', label: 'Issued' },
+        { value: 'void', label: 'Void' },
+    ],
+    deliverynote: [
+        { value: '', label: 'All' },
+        { value: 'draft', label: 'Draft' },
+        { value: 'sent', label: 'Sent' },
+        { value: 'delivered', label: 'Delivered' },
     ],
 };
 
@@ -49,7 +62,7 @@ export default function DocumentsIndex({ type, documents, filters, periods }: Do
     const title = `${type.label}s`;
     const breadcrumbs: BreadcrumbItem[] = [{ title, href: `/${type.plural}` }];
     const isInvoice = type.value === 'invoice';
-    const requestsPayment = type.value !== 'estimate';
+    const requestsPayment = type.requests_payment;
     const { flash } = usePage<SharedData & { flash?: { status?: string } }>().props;
 
     return (
@@ -68,11 +81,13 @@ export default function DocumentsIndex({ type, documents, filters, periods }: Do
                                     </Link>
                                 </Button>
                             )}
-                            <Button asChild>
-                                <Link href={route(`${type.plural}.create`)}>
-                                    <Plus /> New {type.label.toLowerCase()}
-                                </Link>
-                            </Button>
+                            {type.value !== 'creditnote' && (
+                                <Button asChild>
+                                    <Link href={route(`${type.plural}.create`)}>
+                                        <Plus /> New {type.label.toLowerCase()}
+                                    </Link>
+                                </Button>
+                            )}
                         </>
                     }
                 />
@@ -81,6 +96,20 @@ export default function DocumentsIndex({ type, documents, filters, periods }: Do
                     <p className="text-muted-foreground text-sm">
                         Pro-forma invoices ask for payment before the work or delivery. They aren't VAT invoices, so they stay out of your income, VAT
                         and tax return figures. Convert one into an invoice once it's paid or the work is done.
+                    </p>
+                )}
+
+                {type.value === 'creditnote' && (
+                    <p className="text-muted-foreground text-sm">
+                        A credit note cancels all or part of an invoice. Once issued, it comes off the invoice's balance and your income and VAT. To
+                        make one, open the invoice and choose "Credit note".
+                    </p>
+                )}
+
+                {type.value === 'deliverynote' && (
+                    <p className="text-muted-foreground text-sm">
+                        Delivery notes list what you delivered, without prices, with space for the customer to sign. Make one from scratch, or from an
+                        invoice, estimate or pro-forma.
                     </p>
                 )}
 
@@ -135,9 +164,11 @@ export default function DocumentsIndex({ type, documents, filters, periods }: Do
                                     <th className="px-4 py-2 font-medium">Number</th>
                                     <th className="px-4 py-2 font-medium">Client</th>
                                     <th className="hidden px-4 py-2 font-medium md:table-cell">Date</th>
-                                    <th className="hidden px-4 py-2 font-medium md:table-cell">{requestsPayment ? 'Due' : 'Valid until'}</th>
+                                    {type.has_due_date && (
+                                        <th className="hidden px-4 py-2 font-medium md:table-cell">{requestsPayment ? 'Due' : 'Valid until'}</th>
+                                    )}
                                     <th className="px-4 py-2 font-medium">Status</th>
-                                    <th className="px-4 py-2 text-right font-medium">Total</th>
+                                    {type.shows_prices && <th className="px-4 py-2 text-right font-medium">Total</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
@@ -150,13 +181,17 @@ export default function DocumentsIndex({ type, documents, filters, periods }: Do
                                         </td>
                                         <td className="px-4 py-3">{document.client_name}</td>
                                         <td className="hidden px-4 py-3 whitespace-nowrap md:table-cell">{formatDate(document.issue_date)}</td>
-                                        <td className="hidden px-4 py-3 whitespace-nowrap md:table-cell">{formatDate(document.due_date)}</td>
+                                        {type.has_due_date && (
+                                            <td className="hidden px-4 py-3 whitespace-nowrap md:table-cell">{formatDate(document.due_date)}</td>
+                                        )}
                                         <td className="px-4 py-3">
                                             <DocumentStatusBadge status={document.status} overdue={document.is_overdue} />
                                         </td>
-                                        <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
-                                            {formatMoney(document.total, document.currency)}
-                                        </td>
+                                        {type.shows_prices && (
+                                            <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
+                                                {formatMoney(document.total, document.currency)}
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>

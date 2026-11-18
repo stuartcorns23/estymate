@@ -30,7 +30,20 @@ import {
     type SharedData,
 } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { ChevronDown, Download, FileOutput, Link as LinkIcon, Mail, Pencil, PoundSterling, Repeat, Trash2 } from 'lucide-react';
+import {
+    ChevronDown,
+    Download,
+    FileMinus,
+    FileOutput,
+    Link as LinkIcon,
+    Mail,
+    Pencil,
+    PoundSterling,
+    Repeat,
+    Trash2,
+    Truck,
+    Undo2,
+} from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 interface Item {
@@ -43,22 +56,38 @@ interface Item {
     net_amount: number;
 }
 
+interface LinkedDocument {
+    number: string;
+    label: string;
+    url: string;
+    status: DocumentStatus;
+    issue_date: string;
+    total?: number;
+}
+
 interface DocumentDetail extends DocumentSummary {
     reference: string | null;
     po_number: string | null;
     notes: string | null;
+    delivery_address: string | null;
     subtotal: number;
     tax_total: number;
     sent_at: string | null;
     client: Client;
     items: Item[];
     vat_breakdown: { rate: string; net: number; tax: number }[];
-    source: { number: string; label: string; url: string } | null;
+    source: { number: string; label: string; url: string; issue_date: string } | null;
     converted_to: { number: string; label: string; url: string } | null;
     is_editable: boolean;
     is_deletable: boolean;
     email_message: string;
     amount_paid: number;
+    amount_credited: number;
+    can_credit: boolean;
+    credit_notes: LinkedDocument[];
+    delivery_notes: LinkedDocument[];
+    refund: { amount: number; refunded_on: string; method: string; reference: string | null } | null;
+    refundable: number;
     balance_due: number;
     public_url: string;
     payments: { id: number; amount: number; paid_on: string; method: string; reference: string | null }[];
@@ -363,6 +392,127 @@ function ConvertProFormaDialog({ document, paymentMethods }: { document: Documen
     );
 }
 
+function RefundDialog({ document, paymentMethods }: { document: DocumentDetail; paymentMethods: Option[] }) {
+    const [open, setOpen] = useState(false);
+    const { data, setData, post, processing, errors } = useForm({
+        amount: (document.refundable / 100).toFixed(2),
+        refunded_on: today(),
+        method: 'bank_transfer',
+        reference: '',
+    });
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        post(route('creditnotes.refund.store', document.id), {
+            preserveScroll: true,
+            onSuccess: () => setOpen(false),
+        });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline">
+                    <Undo2 /> Record refund
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <form onSubmit={submit} className="space-y-4">
+                    <DialogHeader>
+                        <DialogTitle>Record a refund</DialogTitle>
+                        <DialogDescription>
+                            The client had already paid, so {formatMoney(document.refundable, document.currency)} is owed back to them. Record it once
+                            you've paid it, and it comes off your income for that date.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-2">
+                            <Label htmlFor="refund-amount">Amount (£)</Label>
+                            <Input
+                                id="refund-amount"
+                                inputMode="decimal"
+                                required
+                                value={data.amount}
+                                onChange={(e) => setData('amount', e.target.value)}
+                            />
+                            <InputError message={errors.amount} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="refund-date">Date refunded</Label>
+                            <Input
+                                id="refund-date"
+                                type="date"
+                                required
+                                max={today()}
+                                value={data.refunded_on}
+                                onChange={(e) => setData('refunded_on', e.target.value)}
+                            />
+                            <InputError message={errors.refunded_on} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="refund-method">Method</Label>
+                            <Select value={data.method} onValueChange={(value) => setData('method', value)}>
+                                <SelectTrigger id="refund-method">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {paymentMethods.map((method) => (
+                                        <SelectItem key={method.value} value={method.value}>
+                                            {method.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <InputError message={errors.method} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="refund-reference">Reference</Label>
+                            <Input id="refund-reference" value={data.reference} onChange={(e) => setData('reference', e.target.value)} />
+                            <InputError message={errors.reference} />
+                        </div>
+                    </div>
+
+                    <DialogFooter className="gap-2">
+                        <DialogClose asChild>
+                            <Button type="button" variant="secondary">
+                                Cancel
+                            </Button>
+                        </DialogClose>
+                        <Button disabled={processing}>Record refund</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function LinkedDocuments({ title, documents, money }: { title: string; documents: LinkedDocument[]; money: (pence: number) => string }) {
+    if (documents.length === 0) {
+        return null;
+    }
+
+    return (
+        <section className="space-y-3">
+            <h2 className="font-medium">{title}</h2>
+            <ul className="divide-y rounded-lg border">
+                {documents.map((linked) => (
+                    <li key={linked.url} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                        <span className="flex items-center gap-3">
+                            <Link href={linked.url} className="font-medium underline">
+                                {linked.number}
+                            </Link>
+                            <span className="text-muted-foreground">{formatDate(linked.issue_date)}</span>
+                            <DocumentStatusBadge status={linked.status} />
+                        </span>
+                        {linked.total !== undefined && <span className="tabular-nums">{money(linked.total)}</span>}
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
 function SendDialog({ type, document }: { type: DocumentTypeInfo; document: DocumentDetail }) {
     const [open, setOpen] = useState(false);
     const { data, setData, post, processing, errors } = useForm({
@@ -421,10 +571,13 @@ function SendDialog({ type, document }: { type: DocumentTypeInfo; document: Docu
 }
 
 export default function ShowDocument({ type, document, statuses, paymentMethods, frequencies }: ShowDocumentProps) {
-    const { flash } = usePage<SharedData & { flash?: { status?: string } }>().props;
+    const { flash, errors } = usePage<SharedData & { flash?: { status?: string }; errors: Record<string, string | undefined> }>().props;
     const isInvoice = type.value === 'invoice';
     const isProForma = type.value === 'proforma';
-    const requestsPayment = type.value !== 'estimate';
+    const isCreditNote = type.value === 'creditnote';
+    const isDeliveryNote = type.value === 'deliverynote';
+    const requestsPayment = type.requests_payment;
+    const showsPrices = type.shows_prices;
     const label = type.label.toLowerCase();
     const money = (pence: number) => formatMoney(pence, document.currency);
     const breadcrumbs: BreadcrumbItem[] = [
@@ -435,7 +588,8 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
     const canConvert = type.converts_to_invoice && !['invoiced', 'declined', 'void'].includes(document.status);
     const canRecordPayment = isInvoice && !['draft', 'void', 'paid'].includes(document.status);
     const canRepeat = isInvoice && document.status !== 'void' && !document.repeat_schedule;
-    const canChangeStatus = document.status !== 'invoiced' && document.amount_paid === 0;
+    const canChangeStatus = document.status !== 'invoiced' && document.amount_paid === 0 && document.amount_credited === 0 && !document.refund;
+    const canMakeDeliveryNote = type.makes_delivery_notes && document.status !== 'void';
 
     const [copied, setCopied] = useState(false);
     const copyLink = () => {
@@ -485,6 +639,17 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                                     <FileOutput /> Convert to invoice
                                 </Button>
                             )}
+                            {document.can_credit && (
+                                <Button variant="outline" onClick={() => router.post(route('invoices.credit-note', document.id))}>
+                                    <FileMinus /> Credit note
+                                </Button>
+                            )}
+                            {canMakeDeliveryNote && (
+                                <Button variant="outline" onClick={() => router.post(route(`${type.plural}.delivery-note`, document.id))}>
+                                    <Truck /> Delivery note
+                                </Button>
+                            )}
+                            {document.refundable > 0 && <RefundDialog document={document} paymentMethods={paymentMethods} />}
                             {canRepeat && <RepeatDialog document={document} frequencies={frequencies} />}
                             {canRecordPayment && <RecordPaymentDialog document={document} paymentMethods={paymentMethods} />}
                             {canChangeStatus && (
@@ -518,7 +683,7 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                     )}
                     {document.source && (
                         <span className="text-muted-foreground">
-                            Created from{' '}
+                            {isCreditNote ? 'Credits' : 'Created from'}{' '}
                             <Link href={document.source.url} className="underline">
                                 {document.source.label} {document.source.number}
                             </Link>
@@ -544,6 +709,7 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                         </span>
                     )}
                     {flash?.status && <span className="text-green-700 dark:text-green-400">{flash.status}</span>}
+                    {errors.status && <span className="text-destructive">{errors.status}</span>}
                 </div>
 
                 {isProForma && document.status !== 'invoiced' && (
@@ -553,11 +719,40 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                     </p>
                 )}
 
+                {isCreditNote && document.status === 'draft' && (
+                    <p className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+                        This credit note is a draft, so it doesn't count yet. Send it to the client, or mark it as sent, to take it off the invoice's
+                        balance and your income and VAT.
+                    </p>
+                )}
+
+                {document.refund && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-4 text-sm">
+                        <span>
+                            Refunded <span className="font-medium tabular-nums">{money(document.refund.amount)}</span>{' '}
+                            <span className="text-muted-foreground">
+                                on {formatDate(document.refund.refunded_on)} by {document.refund.method.toLowerCase()}
+                                {document.refund.reference && ` (${document.refund.reference})`}
+                            </span>
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                                confirm('Remove this refund?') &&
+                                router.delete(route('creditnotes.refund.destroy', document.id), { preserveScroll: true })
+                            }
+                        >
+                            Remove
+                        </Button>
+                    </div>
+                )}
+
                 <div className="bg-card space-y-8 rounded-xl border p-6 shadow-xs">
                     <div className="grid gap-6 sm:grid-cols-2">
                         <div className="text-sm">
                             <p className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">
-                                {requestsPayment ? 'Bill to' : 'Prepared for'}
+                                {requestsPayment || isCreditNote ? 'Bill to' : isDeliveryNote ? 'Customer' : 'Prepared for'}
                             </p>
                             <p className="font-medium">{document.client.name}</p>
                             {[
@@ -572,10 +767,22 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                                 .map((line, i) => (
                                     <p key={i}>{line}</p>
                                 ))}
+                            {document.delivery_address && (
+                                <>
+                                    <p className="text-muted-foreground mt-4 mb-1 text-xs tracking-wide uppercase">Deliver to</p>
+                                    <p className="whitespace-pre-line">{document.delivery_address}</p>
+                                </>
+                            )}
                         </div>
                         <dl className="grid grid-cols-2 gap-y-1 text-sm sm:justify-self-end">
-                            <dt className="text-muted-foreground">Date</dt>
+                            <dt className="text-muted-foreground">{isDeliveryNote ? 'Delivery date' : 'Date'}</dt>
                             <dd className="text-right">{formatDate(document.issue_date)}</dd>
+                            {isCreditNote && document.source && (
+                                <>
+                                    <dt className="text-muted-foreground">Invoice date</dt>
+                                    <dd className="text-right">{formatDate(document.source.issue_date)}</dd>
+                                </>
+                            )}
                             {document.due_date && (
                                 <>
                                     <dt className="text-muted-foreground">{requestsPayment ? 'Due' : 'Valid until'}</dt>
@@ -602,48 +809,68 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                             <thead className="text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
                                 <tr>
                                     <th className="py-2 pr-4 font-medium">Description</th>
-                                    <th className="py-2 pr-4 text-right font-medium">Qty</th>
-                                    <th className="py-2 pr-4 text-right font-medium">Price</th>
-                                    <th className="py-2 pr-4 text-right font-medium">VAT</th>
-                                    <th className="py-2 text-right font-medium">Amount</th>
+                                    <th className={`py-2 text-right font-medium ${showsPrices ? 'pr-4' : ''}`}>Qty</th>
+                                    {showsPrices && (
+                                        <>
+                                            <th className="py-2 pr-4 text-right font-medium">Price</th>
+                                            <th className="py-2 pr-4 text-right font-medium">VAT</th>
+                                            <th className="py-2 text-right font-medium">Amount</th>
+                                        </>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
                                 {document.items.map((item) => (
                                     <tr key={item.id}>
                                         <td className="py-3 pr-4 whitespace-pre-line">{item.description}</td>
-                                        <td className="py-3 pr-4 text-right whitespace-nowrap tabular-nums">
+                                        <td className={`py-3 text-right whitespace-nowrap tabular-nums ${showsPrices ? 'pr-4' : ''}`}>
                                             {Number(item.quantity)} {item.unit}
                                         </td>
-                                        <td className="py-3 pr-4 text-right tabular-nums">{money(item.unit_price)}</td>
-                                        <td className="py-3 pr-4 text-right tabular-nums">{formatRate(item.tax_rate)}</td>
-                                        <td className="py-3 text-right tabular-nums">{money(item.net_amount)}</td>
+                                        {showsPrices && (
+                                            <>
+                                                <td className="py-3 pr-4 text-right tabular-nums">{money(item.unit_price)}</td>
+                                                <td className="py-3 pr-4 text-right tabular-nums">{formatRate(item.tax_rate)}</td>
+                                                <td className="py-3 text-right tabular-nums">{money(item.net_amount)}</td>
+                                            </>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
 
-                    <dl className="ml-auto grid w-full max-w-xs grid-cols-2 gap-y-1 text-sm">
-                        <dt className="text-muted-foreground">Subtotal</dt>
-                        <dd className="text-right tabular-nums">{money(document.subtotal)}</dd>
-                        {document.vat_breakdown.map((vat) => (
-                            <div key={vat.rate} className="contents">
-                                <dt className="text-muted-foreground">VAT {formatRate(vat.rate)}</dt>
-                                <dd className="text-right tabular-nums">{money(vat.tax)}</dd>
-                            </div>
-                        ))}
-                        <dt className="border-t pt-2 font-semibold">Total</dt>
-                        <dd className="border-t pt-2 text-right font-semibold tabular-nums">{money(document.total)}</dd>
-                        {document.amount_paid > 0 && (
-                            <>
-                                <dt className="text-muted-foreground">Paid</dt>
-                                <dd className="text-right tabular-nums">−{money(document.amount_paid)}</dd>
-                                <dt className="font-semibold">Balance due</dt>
-                                <dd className="text-right font-semibold tabular-nums">{money(document.balance_due)}</dd>
-                            </>
-                        )}
-                    </dl>
+                    {showsPrices && (
+                        <dl className="ml-auto grid w-full max-w-xs grid-cols-2 gap-y-1 text-sm">
+                            <dt className="text-muted-foreground">Subtotal</dt>
+                            <dd className="text-right tabular-nums">{money(document.subtotal)}</dd>
+                            {document.vat_breakdown.map((vat) => (
+                                <div key={vat.rate} className="contents">
+                                    <dt className="text-muted-foreground">VAT {formatRate(vat.rate)}</dt>
+                                    <dd className="text-right tabular-nums">{money(vat.tax)}</dd>
+                                </div>
+                            ))}
+                            <dt className="border-t pt-2 font-semibold">{isCreditNote ? 'Total credit' : 'Total'}</dt>
+                            <dd className="border-t pt-2 text-right font-semibold tabular-nums">{money(document.total)}</dd>
+                            {isInvoice && (document.amount_paid > 0 || document.amount_credited > 0) && (
+                                <>
+                                    {document.amount_paid > 0 && (
+                                        <>
+                                            <dt className="text-muted-foreground">Paid</dt>
+                                            <dd className="text-right tabular-nums">−{money(document.amount_paid)}</dd>
+                                        </>
+                                    )}
+                                    {document.amount_credited > 0 && (
+                                        <>
+                                            <dt className="text-muted-foreground">Credited</dt>
+                                            <dd className="text-right tabular-nums">−{money(document.amount_credited)}</dd>
+                                        </>
+                                    )}
+                                    <dt className="font-semibold">Balance due</dt>
+                                    <dd className="text-right font-semibold tabular-nums">{money(document.balance_due)}</dd>
+                                </>
+                            )}
+                        </dl>
+                    )}
 
                     {document.notes && <p className="text-muted-foreground text-sm whitespace-pre-line">{document.notes}</p>}
                 </div>
@@ -676,6 +903,9 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                         </ul>
                     </section>
                 )}
+
+                <LinkedDocuments title="Credit notes" documents={document.credit_notes} money={money} />
+                <LinkedDocuments title="Delivery notes" documents={document.delivery_notes} money={money} />
 
                 {document.is_deletable && (
                     <Button variant="ghost" className="text-destructive" onClick={destroy}>

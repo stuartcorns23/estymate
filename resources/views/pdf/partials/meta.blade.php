@@ -1,8 +1,18 @@
-{{-- Dates, PO number and reference, as label/value rows. A UK VAT invoice must show its tax point; a pro-forma has none. --}}
+{{-- Dates, PO number and reference, as label/value rows. A UK VAT invoice must show its tax point; a pro-forma has none. A credit note names the invoice it credits. --}}
 @php
-    $rows = [[$isInvoice ? 'Invoice date' : 'Date', $document->issue_date->format('j M Y')]];
-    if ($isInvoice) {
+    $dateLabel = match (true) {
+        $isInvoice => 'Invoice date',
+        $isCreditNote => 'Credit note date',
+        $isDeliveryNote => 'Delivery date',
+        default => 'Date',
+    };
+    $rows = [[$dateLabel, $document->issue_date->format('j M Y')]];
+    if ($isInvoice || $isCreditNote) {
         $rows[] = ['Tax point', $document->issue_date->format('j M Y')];
+    }
+    if ($creditedInvoice) {
+        $rows[] = ['Credits invoice', $creditedInvoice->number];
+        $rows[] = ['Invoice date', $creditedInvoice->issue_date->format('j M Y')];
     }
     if ($document->due_date) {
         $rows[] = [$isInvoice ? 'Due date' : ($requestsPayment ? 'Payment due' : 'Valid until'), $document->due_date->format('j M Y')];

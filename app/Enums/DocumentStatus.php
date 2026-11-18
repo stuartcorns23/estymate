@@ -11,6 +11,9 @@ enum DocumentStatus: string
     case Invoiced = 'invoiced';
     case Paid = 'paid';
     case Void = 'void';
+    // A credit note covers the whole invoice, with nothing paid on it.
+    case Credited = 'credited';
+    case Delivered = 'delivered';
 
     public function label(): string
     {

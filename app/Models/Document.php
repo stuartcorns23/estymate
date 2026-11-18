@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\DocumentStatus;
 use App\Enums\DocumentType;
+use App\Enums\PaymentMethod;
 use App\Models\Concerns\BelongsToBusiness;
 use Database\Factories\DocumentFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -41,6 +42,7 @@ class Document extends Model
         'reference',
         'po_number',
         'notes',
+        'delivery_address',
     ];
 
     /**
@@ -59,6 +61,10 @@ class Document extends Model
             'tax_total' => 'integer',
             'total' => 'integer',
             'amount_paid' => 'integer',
+            'amount_credited' => 'integer',
+            'refund_amount' => 'integer',
+            'refunded_on' => 'date',
+            'refund_method' => PaymentMethod::class,
             'last_reminder_at' => 'datetime',
             'sent_at' => 'datetime',
             'paid_at' => 'datetime',
@@ -147,9 +153,12 @@ class Document extends Model
         return $this->hasOne(RecurringInvoice::class, 'template_document_id');
     }
 
+    /**
+     * What the client still owes: the total, less payments and issued credit notes.
+     */
     public function balanceDue(): int
     {
-        return max(0, $this->total - $this->amount_paid);
+        return max(0, $this->total - $this->amount_paid - (int) $this->amount_credited);
     }
 
     /**
@@ -158,20 +167,87 @@ class Document extends Model
     public function refreshPayments(): void
     {
         $this->amount_paid = (int) $this->payments()->sum('amount');
-
-        if ($this->total > 0 && $this->amount_paid >= $this->total) {
-            $this->status = DocumentStatus::Paid;
-            $this->paid_at ??= $this->payments()->max('paid_on') ?? now();
-        } elseif ($this->status === DocumentStatus::Paid) {
-            $this->status = DocumentStatus::Sent;
-            $this->paid_at = null;
-        }
-
+        $this->refreshSettled();
         $this->save();
     }
 
     /**
-     * The estimate an invoice was created from.
+     * Recalculate how much of this invoice its issued credit notes cancel, and move it in or out of
+     * "paid" or "credited" to match.
+     */
+    public function refreshCredits(): void
+    {
+        $this->amount_credited = (int) $this->creditNotes()->where('status', DocumentStatus::Sent)->sum('total');
+        $this->refreshSettled();
+        $this->save();
+    }
+
+    /**
+     * An invoice is settled once payments and credit notes cover it: "paid" if anything was paid,
+     * otherwise "credited". It goes back to "sent" when that's no longer true.
+     */
+    private function refreshSettled(): void
+    {
+        $settled = $this->total > 0 && $this->amount_paid + (int) $this->amount_credited >= $this->total;
+
+        if ($settled) {
+            if ($this->amount_paid > 0) {
+                $this->status = DocumentStatus::Paid;
+                $this->paid_at ??= $this->payments()->max('paid_on') ?? now();
+            } else {
+                $this->status = DocumentStatus::Credited;
+                $this->paid_at = null;
+            }
+        } elseif (! $settled && in_array($this->status, [DocumentStatus::Paid, DocumentStatus::Credited], true)) {
+            $this->status = DocumentStatus::Sent;
+            $this->paid_at = null;
+        }
+    }
+
+    /**
+     * Credit notes raised against this invoice.
+     *
+     * @return HasMany<Document, $this>
+     */
+    public function creditNotes(): HasMany
+    {
+        return $this->hasMany(Document::class, 'source_document_id')->where('type', DocumentType::CreditNote);
+    }
+
+    /**
+     * Delivery notes made from this document.
+     *
+     * @return HasMany<Document, $this>
+     */
+    public function deliveryNotes(): HasMany
+    {
+        return $this->hasMany(Document::class, 'source_document_id')->where('type', DocumentType::DeliveryNote);
+    }
+
+    /**
+     * How much of a credit note can still be paid back to the client: what they paid on the invoice
+     * beyond what they now owe, up to the credit note's total.
+     */
+    public function refundable(): int
+    {
+        if ($this->type !== DocumentType::CreditNote || $this->status !== DocumentStatus::Sent || $this->refund_amount > 0) {
+            return 0;
+        }
+
+        $invoice = $this->source;
+
+        if (! $invoice) {
+            return 0;
+        }
+
+        $overpaid = $invoice->amount_paid + $invoice->amount_credited - $invoice->total;
+
+        return max(0, min($this->total, $overpaid));
+    }
+
+    /**
+     * The document this one was made from: the estimate or pro-forma behind an invoice, the invoice
+     * a credit note credits, or what a delivery note was made from.
      *
      * @return BelongsTo<Document, $this>
      */
@@ -181,22 +257,28 @@ class Document extends Model
     }
 
     /**
-     * The invoice an estimate was converted into.
+     * The invoice an estimate or pro-forma was converted into.
      *
      * @return HasOne<Document, $this>
      */
     public function convertedTo(): HasOne
     {
-        return $this->hasOne(Document::class, 'source_document_id');
+        return $this->hasOne(Document::class, 'source_document_id')->where('type', DocumentType::Invoice);
     }
 
     /**
-     * Paid, void and converted documents are final and can't be edited.
+     * Paid, credited, void and converted documents are final and can't be edited. Nor can a credit
+     * note once it's been issued, since the client may have relied on it.
      */
     public function isEditable(): bool
     {
+        if ($this->type === DocumentType::CreditNote) {
+            return $this->status === DocumentStatus::Draft;
+        }
+
         return $this->amount_paid === 0
-            && ! in_array($this->status, [DocumentStatus::Paid, DocumentStatus::Void, DocumentStatus::Invoiced], true);
+            && (int) $this->amount_credited === 0
+            && ! in_array($this->status, [DocumentStatus::Paid, DocumentStatus::Credited, DocumentStatus::Void, DocumentStatus::Invoiced], true);
     }
 
     /**

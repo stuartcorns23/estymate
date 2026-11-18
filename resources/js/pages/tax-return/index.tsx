@@ -27,6 +27,7 @@ interface TaxReport {
     currency: string;
     turnover: number;
     sales_count: number;
+    credits: { count: number; amount: number };
     expense_boxes: ExpenseBox[];
     total_expenses: number;
     expense_count: number;
@@ -185,6 +186,16 @@ export default function TaxReturn({ included, requiredPlan, report, years, bases
                                         Turnover
                                         <p className="text-muted-foreground">
                                             {report.sales_count} {report.basis === 'cash' ? 'payments received' : 'invoices issued'}
+                                            {report.credits.count > 0 &&
+                                                `, less ${money(report.credits.amount)} from ${report.credits.count} ${
+                                                    report.basis === 'cash'
+                                                        ? report.credits.count === 1
+                                                            ? 'refund'
+                                                            : 'refunds'
+                                                        : report.credits.count === 1
+                                                          ? 'credit note'
+                                                          : 'credit notes'
+                                                }`}
                                         </p>
                                     </td>
                                     <td className="px-4 py-3 text-right font-medium tabular-nums">{money(report.turnover)}</td>

@@ -13,7 +13,13 @@ export interface PlanInfo {
     price: number;
     yearly_price: number;
     limits: Record<
-        'clients' | 'invoices_per_month' | 'estimates_per_month' | 'proformas_per_month' | 'team_members' | 'assistant_messages_per_month',
+        | 'clients'
+        | 'invoices_per_month'
+        | 'estimates_per_month'
+        | 'proformas_per_month'
+        | 'deliverynotes_per_month'
+        | 'team_members'
+        | 'assistant_messages_per_month',
         number | null
     >;
     features?: Partial<Record<'tax_return', boolean>>;
@@ -43,6 +49,8 @@ export interface Business extends BusinessSummary {
     estimate_prefix: string;
     invoice_prefix: string;
     proforma_prefix: string;
+    creditnote_prefix: string;
+    deliverynote_prefix: string;
     payment_terms_days: number;
     payment_details: string | null;
     send_reminders: boolean;
@@ -129,13 +137,17 @@ export interface Product {
     tax_rate?: Pick<TaxRate, 'id' | 'name' | 'rate'> | null;
 }
 
-export type DocumentStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'invoiced' | 'paid' | 'void';
+export type DocumentStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'invoiced' | 'paid' | 'void' | 'credited' | 'delivered';
 
 export interface DocumentTypeInfo {
-    value: 'estimate' | 'invoice' | 'proforma';
+    value: 'estimate' | 'invoice' | 'proforma' | 'creditnote' | 'deliverynote';
     label: string;
     plural: string;
     converts_to_invoice: boolean;
+    requests_payment: boolean;
+    has_due_date: boolean;
+    shows_prices: boolean;
+    makes_delivery_notes: boolean;
 }
 
 export interface DocumentSummary {

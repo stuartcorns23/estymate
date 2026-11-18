@@ -19,12 +19,17 @@ class PublicDocumentController extends Controller
     public function show(Request $request, string $token): Response
     {
         $document = $this->find($token);
+        // A delivery note may be handed to whoever takes the delivery, so its prices never leave the server.
+        $prices = $document->type->showsPrices();
 
         return Inertia::render('public/document', [
             'document' => [
                 'type' => $document->type->label(),
                 'requests_payment' => $document->type->requestsPayment(),
                 'is_pro_forma' => $document->type === DocumentType::ProForma,
+                'shows_prices' => $prices,
+                'credits_invoice' => $document->type === DocumentType::CreditNote ? $document->source?->number : null,
+                'delivery_address' => $document->delivery_address,
                 'number' => $document->number,
                 'status' => $document->status->value,
                 'is_overdue' => $document->isOverdue(),
@@ -32,13 +37,16 @@ class PublicDocumentController extends Controller
                 'due_date' => $document->due_date?->toDateString(),
                 'po_number' => $document->po_number,
                 'currency' => $document->currency,
-                'subtotal' => $document->subtotal,
-                'tax_total' => $document->tax_total,
-                'total' => $document->total,
+                'subtotal' => $prices ? $document->subtotal : 0,
+                'tax_total' => $prices ? $document->tax_total : 0,
+                'total' => $prices ? $document->total : 0,
                 'amount_paid' => $document->amount_paid,
+                'amount_credited' => $document->amount_credited,
                 'balance_due' => $document->type === DocumentType::Invoice ? $document->balanceDue() : null,
                 'notes' => $document->notes,
-                'items' => $document->items->map->only('id', 'description', 'quantity', 'unit', 'unit_price', 'tax_rate', 'net_amount'),
+                'items' => $prices
+                    ? $document->items->map->only('id', 'description', 'quantity', 'unit', 'unit_price', 'tax_rate', 'net_amount')
+                    : $document->items->map->only('id', 'description', 'quantity', 'unit'),
                 'business' => $document->business->only('name', 'email', 'phone'),
                 'client_name' => $document->client->name,
                 'can_pay' => $document->canBePaidOnline(),
@@ -92,7 +100,7 @@ class PublicDocumentController extends Controller
         return Document::withoutGlobalScopes()
             ->whereNull('deleted_at')
             ->where('public_token', $token)
-            ->with(['business', 'client', 'items'])
+            ->with(['business', 'client', 'items', 'source'])
             ->firstOrFail();
     }
 }

@@ -35,6 +35,15 @@ class PoNumberTest extends TestCase
 
     private function create(DocumentType $type, ?string $poNumber): Document
     {
+        if ($type->createdFromInvoice()) {
+            // A credit note takes its invoice's PO number.
+            $invoice = $this->create(DocumentType::Invoice, $poNumber);
+            $this->patch("/invoices/{$invoice->id}/status", ['status' => 'sent']);
+            $this->post("/invoices/{$invoice->id}/credit-note")->assertRedirect();
+
+            return Document::ofType($type)->latest('id')->first();
+        }
+
         $this->post("/{$type->plural()}", [
             'client_id' => $this->client->id,
             'issue_date' => '2026-11-18',
@@ -57,7 +66,7 @@ class PoNumberTest extends TestCase
 
     public function test_new_documents_start_with_the_clients_po_number()
     {
-        foreach (DocumentType::cases() as $type) {
+        foreach (array_filter(DocumentType::cases(), fn (DocumentType $type) => ! $type->createdFromInvoice()) as $type) {
             $this->get("/{$type->plural()}/create?client_id={$this->client->id}")->assertInertia(fn (Assert $page) => $page
                 ->where('document.po_number', 'PO-4500123')
                 ->where('clients.0.default_po_number', 'PO-4500123'));

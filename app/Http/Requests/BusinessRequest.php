@@ -30,6 +30,8 @@ class BusinessRequest extends FormRequest
             'estimate_prefix' => ['sometimes', 'string', 'max:20'],
             'invoice_prefix' => ['sometimes', 'string', 'max:20'],
             'proforma_prefix' => ['sometimes', 'string', 'max:20'],
+            'creditnote_prefix' => ['sometimes', 'string', 'max:20'],
+            'deliverynote_prefix' => ['sometimes', 'string', 'max:20'],
             'payment_terms_days' => ['sometimes', 'integer', 'min:0', 'max:365'],
             'payment_details' => ['nullable', 'string', 'max:2000'],
             'send_reminders' => ['sometimes', 'boolean'],

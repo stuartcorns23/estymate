@@ -11,6 +11,7 @@ use App\Tax\Period;
 use App\Tax\TaxYear;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -39,9 +40,10 @@ class DashboardController extends Controller
 
         return Inertia::render('dashboard', [
             'totals' => [
-                'outstanding' => (int) (clone $unpaid)->selectRaw('coalesce(sum(total - amount_paid), 0) as owed')->value('owed'),
-                'overdue' => (int) (clone $overdue)->selectRaw('coalesce(sum(total - amount_paid), 0) as owed')->value('owed'),
-                'paid' => (int) $period->apply(Payment::query(), 'paid_on')->sum('amount'),
+                'outstanding' => (int) (clone $unpaid)->selectRaw('coalesce(sum(total - amount_paid - amount_credited), 0) as owed')->value('owed'),
+                'overdue' => (int) (clone $overdue)->selectRaw('coalesce(sum(total - amount_paid - amount_credited), 0) as owed')->value('owed'),
+                // Money in, less anything paid back to clients against credit notes.
+                'paid' => (int) $period->apply(Payment::query(), 'paid_on')->sum('amount') - (int) $this->refunds($period)->sum('refund_amount'),
                 'drafts' => $invoices()->where('status', DocumentStatus::Draft)->count(),
                 'spent' => (int) $period->apply(Expense::query(), 'date')->sum('total'),
             ],
@@ -91,11 +93,25 @@ class DashboardController extends Controller
             $buckets[$bucket($payment->paid_on)]['income'] += $payment->amount;
         }
 
+        foreach ($this->refunds($period)->get(['refunded_on', 'refund_amount']) as $refund) {
+            $buckets[$bucket($refund->refunded_on)]['income'] -= $refund->refund_amount;
+        }
+
         foreach ($period->apply(Expense::query(), 'date')->get(['date', 'total']) as $expense) {
             $buckets[$bucket($expense->date)]['expenses'] += $expense->total;
         }
 
         return array_values($buckets);
+    }
+
+    /**
+     * Credit notes with money paid back to the client in the period.
+     *
+     * @return Builder<Document>
+     */
+    private function refunds(Period $period): Builder
+    {
+        return $period->apply(Document::ofType(DocumentType::CreditNote)->where('refund_amount', '>', 0), 'refunded_on');
     }
 
     /**

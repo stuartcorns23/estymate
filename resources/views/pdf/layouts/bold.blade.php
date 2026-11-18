@@ -30,8 +30,13 @@
             </td>
             <td style="width: 42%">
                 <div class="due">
-                    <div class="due-label">{{ $requestsPayment ? 'Amount due' : 'Estimate total' }}</div>
-                    <div class="due-amount">{{ $money($isInvoice ? $document->balanceDue() : $document->total) }}</div>
+                    @if ($isDeliveryNote)
+                        <div class="due-label">Delivery date</div>
+                        <div class="due-amount">{{ $document->issue_date->format('j M Y') }}</div>
+                    @else
+                        <div class="due-label">{{ $requestsPayment ? 'Amount due' : ($isCreditNote ? 'Total credit' : 'Estimate total') }}</div>
+                        <div class="due-amount">{{ $money($isInvoice ? $document->balanceDue() : $document->total) }}</div>
+                    @endif
                     @if ($document->due_date)
                         <div>{{ $requestsPayment ? 'Due' : 'Valid until' }} {{ $document->due_date->format('j M Y') }}</div>
                     @endif
