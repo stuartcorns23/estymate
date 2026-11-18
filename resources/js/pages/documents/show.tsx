@@ -52,8 +52,8 @@ interface DocumentDetail extends DocumentSummary {
     client: Client;
     items: Item[];
     vat_breakdown: { rate: string; net: number; tax: number }[];
-    source: { number: string; url: string } | null;
-    converted_to: { number: string; url: string } | null;
+    source: { number: string; label: string; url: string } | null;
+    converted_to: { number: string; label: string; url: string } | null;
     is_editable: boolean;
     is_deletable: boolean;
     email_message: string;
@@ -260,6 +260,108 @@ function RepeatDialog({ document, frequencies }: { document: DocumentDetail; fre
     );
 }
 
+function ConvertProFormaDialog({ document, paymentMethods }: { document: DocumentDetail; paymentMethods: Option[] }) {
+    const [open, setOpen] = useState(false);
+    const { data, setData, post, processing, errors } = useForm({
+        paid: true as boolean,
+        amount: (document.total / 100).toFixed(2),
+        paid_on: today(),
+        method: 'bank_transfer',
+        reference: '',
+    });
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        post(route('proformas.convert', document.id), { preserveScroll: true });
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline">
+                    <FileOutput /> Convert to invoice
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <form onSubmit={submit} className="space-y-4">
+                    <DialogHeader>
+                        <DialogTitle>Convert to an invoice</DialogTitle>
+                        <DialogDescription>
+                            A new invoice is created with the same client and lines, and this pro-forma is marked as invoiced. The invoice counts
+                            towards your income and VAT.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex items-center gap-3">
+                        <Checkbox id="convert-paid" checked={data.paid} onCheckedChange={(checked) => setData('paid', checked === true)} />
+                        <Label htmlFor="convert-paid">The client has paid. Issue the invoice now and record the payment on it</Label>
+                    </div>
+
+                    {data.paid ? (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="grid gap-2">
+                                <Label htmlFor="convert-amount">Amount (£)</Label>
+                                <Input
+                                    id="convert-amount"
+                                    inputMode="decimal"
+                                    required
+                                    value={data.amount}
+                                    onChange={(e) => setData('amount', e.target.value)}
+                                />
+                                <InputError message={errors.amount} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="convert-date">Date received</Label>
+                                <Input
+                                    id="convert-date"
+                                    type="date"
+                                    required
+                                    max={today()}
+                                    value={data.paid_on}
+                                    onChange={(e) => setData('paid_on', e.target.value)}
+                                />
+                                <InputError message={errors.paid_on} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="convert-method">Method</Label>
+                                <Select value={data.method} onValueChange={(value) => setData('method', value)}>
+                                    <SelectTrigger id="convert-method">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {paymentMethods.map((method) => (
+                                            <SelectItem key={method.value} value={method.value}>
+                                                {method.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <InputError message={errors.method} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="convert-reference">Reference</Label>
+                                <Input id="convert-reference" value={data.reference} onChange={(e) => setData('reference', e.target.value)} />
+                                <InputError message={errors.reference} />
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-muted-foreground text-sm">You'll get a draft invoice to check before you send it.</p>
+                    )}
+
+                    <DialogFooter className="gap-2">
+                        <DialogClose asChild>
+                            <Button type="button" variant="secondary">
+                                Cancel
+                            </Button>
+                        </DialogClose>
+                        <Button disabled={processing}>{data.paid ? 'Create paid invoice' : 'Create draft invoice'}</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function SendDialog({ type, document }: { type: DocumentTypeInfo; document: DocumentDetail }) {
     const [open, setOpen] = useState(false);
     const { data, setData, post, processing, errors } = useForm({
@@ -320,6 +422,8 @@ function SendDialog({ type, document }: { type: DocumentTypeInfo; document: Docu
 export default function ShowDocument({ type, document, statuses, paymentMethods, frequencies }: ShowDocumentProps) {
     const { flash } = usePage<SharedData & { flash?: { status?: string } }>().props;
     const isInvoice = type.value === 'invoice';
+    const isProForma = type.value === 'proforma';
+    const requestsPayment = type.value !== 'estimate';
     const label = type.label.toLowerCase();
     const money = (pence: number) => formatMoney(pence, document.currency);
     const breadcrumbs: BreadcrumbItem[] = [
@@ -327,7 +431,7 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
         { title: document.number, href: '#' },
     ];
     const canSend = !['void', 'invoiced'].includes(document.status);
-    const canConvert = !isInvoice && !['invoiced', 'declined'].includes(document.status);
+    const canConvert = type.converts_to_invoice && !['invoiced', 'declined', 'void'].includes(document.status);
     const canRecordPayment = isInvoice && !['draft', 'void', 'paid'].includes(document.status);
     const canRepeat = isInvoice && document.status !== 'void' && !document.repeat_schedule;
     const canChangeStatus = document.status !== 'invoiced' && document.amount_paid === 0;
@@ -374,8 +478,9 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                                     <Download /> PDF
                                 </a>
                             </Button>
-                            {canConvert && (
-                                <Button variant="outline" onClick={() => router.post(route('estimates.convert', document.id))}>
+                            {canConvert && isProForma && <ConvertProFormaDialog document={document} paymentMethods={paymentMethods} />}
+                            {canConvert && !isProForma && (
+                                <Button variant="outline" onClick={() => router.post(route(`${type.plural}.convert`, document.id))}>
                                     <FileOutput /> Convert to invoice
                                 </Button>
                             )}
@@ -414,7 +519,7 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                         <span className="text-muted-foreground">
                             Created from{' '}
                             <Link href={document.source.url} className="underline">
-                                estimate {document.source.number}
+                                {document.source.label} {document.source.number}
                             </Link>
                         </span>
                     )}
@@ -422,7 +527,7 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                         <span className="text-muted-foreground">
                             Converted to{' '}
                             <Link href={document.converted_to.url} className="underline">
-                                invoice {document.converted_to.number}
+                                {document.converted_to.label} {document.converted_to.number}
                             </Link>
                         </span>
                     )}
@@ -440,10 +545,19 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                     {flash?.status && <span className="text-green-700 dark:text-green-400">{flash.status}</span>}
                 </div>
 
+                {isProForma && document.status !== 'invoiced' && (
+                    <p className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+                        A pro-forma isn't a VAT invoice, so it isn't counted in your income, VAT or tax return figures. Once the client pays or the
+                        work is done, convert it into an invoice.
+                    </p>
+                )}
+
                 <div className="bg-card space-y-8 rounded-xl border p-6 shadow-xs">
                     <div className="grid gap-6 sm:grid-cols-2">
                         <div className="text-sm">
-                            <p className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">{isInvoice ? 'Bill to' : 'Prepared for'}</p>
+                            <p className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">
+                                {requestsPayment ? 'Bill to' : 'Prepared for'}
+                            </p>
                             <p className="font-medium">{document.client.name}</p>
                             {[
                                 document.client.contact_name,
@@ -463,7 +577,7 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                             <dd className="text-right">{formatDate(document.issue_date)}</dd>
                             {document.due_date && (
                                 <>
-                                    <dt className="text-muted-foreground">{isInvoice ? 'Due' : 'Valid until'}</dt>
+                                    <dt className="text-muted-foreground">{requestsPayment ? 'Due' : 'Valid until'}</dt>
                                     <dd className="text-right">{formatDate(document.due_date)}</dd>
                                 </>
                             )}

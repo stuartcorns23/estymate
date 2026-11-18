@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Billing\Plan;
+use App\Enums\DocumentType;
 use App\Models\Document;
 use App\Models\Expense;
 use App\Models\Payment;
@@ -149,7 +150,7 @@ class TaxReturnController extends Controller
         $first = collect([
             Payment::min('paid_on'),
             Expense::min('date'),
-            Document::min('issue_date'),
+            Document::ofType(DocumentType::Invoice)->min('issue_date'),
         ])->filter()->map(fn ($date) => CarbonImmutable::parse($date))->min();
 
         $current = TaxYear::current()->startYear;

@@ -27,6 +27,13 @@ const statusFilters: Record<DocumentTypeInfo['value'], { value: string; label: s
         { value: 'paid', label: 'Paid' },
         { value: 'void', label: 'Void' },
     ],
+    proforma: [
+        { value: '', label: 'All' },
+        { value: 'draft', label: 'Draft' },
+        { value: 'sent', label: 'Awaiting payment' },
+        { value: 'invoiced', label: 'Invoiced' },
+        { value: 'void', label: 'Void' },
+    ],
 };
 
 interface DocumentsIndexProps {
@@ -39,6 +46,7 @@ export default function DocumentsIndex({ type, documents, filters }: DocumentsIn
     const title = `${type.label}s`;
     const breadcrumbs: BreadcrumbItem[] = [{ title, href: `/${type.plural}` }];
     const isInvoice = type.value === 'invoice';
+    const requestsPayment = type.value !== 'estimate';
     const { flash } = usePage<SharedData & { flash?: { status?: string } }>().props;
 
     return (
@@ -65,6 +73,13 @@ export default function DocumentsIndex({ type, documents, filters }: DocumentsIn
                         </>
                     }
                 />
+
+                {type.value === 'proforma' && (
+                    <p className="text-muted-foreground text-sm">
+                        Pro-forma invoices ask for payment before the work or delivery. They aren't VAT invoices, so they stay out of your income, VAT
+                        and tax return figures. Convert one into an invoice once it's paid or the work is done.
+                    </p>
+                )}
 
                 {flash?.status && (
                     <p className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900 dark:border-green-900 dark:bg-green-950 dark:text-green-100">
@@ -107,7 +122,7 @@ export default function DocumentsIndex({ type, documents, filters }: DocumentsIn
                                     <th className="px-4 py-2 font-medium">Number</th>
                                     <th className="px-4 py-2 font-medium">Client</th>
                                     <th className="hidden px-4 py-2 font-medium md:table-cell">Date</th>
-                                    <th className="hidden px-4 py-2 font-medium md:table-cell">{isInvoice ? 'Due' : 'Valid until'}</th>
+                                    <th className="hidden px-4 py-2 font-medium md:table-cell">{requestsPayment ? 'Due' : 'Valid until'}</th>
                                     <th className="px-4 py-2 font-medium">Status</th>
                                     <th className="px-4 py-2 text-right font-medium">Total</th>
                                 </tr>
