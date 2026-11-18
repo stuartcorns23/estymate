@@ -8,7 +8,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatMoney } from '@/lib/money';
 import { type BreadcrumbItem, type Expense, type Option, type Paginated } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Paperclip, Plus } from 'lucide-react';
+import { FileUp, Paperclip, Plus } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Expenses', href: '/expenses' }];
 
@@ -42,11 +42,18 @@ export default function ExpensesIndex({ expenses, totals, filters, categories, p
                     title="Expenses"
                     description="Purchase invoices, bills and receipts from your suppliers"
                     actions={
-                        <Button asChild>
-                            <Link href={route('expenses.create')}>
-                                <Plus /> Add expense
-                            </Link>
-                        </Button>
+                        <>
+                            <Button variant="outline" asChild>
+                                <Link href={route('expenses.import')}>
+                                    <FileUp /> Import
+                                </Link>
+                            </Button>
+                            <Button asChild>
+                                <Link href={route('expenses.create')}>
+                                    <Plus /> Add expense
+                                </Link>
+                            </Button>
+                        </>
                     }
                 />
 
