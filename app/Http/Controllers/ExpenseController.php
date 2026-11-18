@@ -8,6 +8,7 @@ use App\Models\Expense;
 use App\Services\ExpenseReader\ClaudeExpenseReader;
 use App\Services\ExpenseReader\ExpenseReader;
 use App\Services\ExpenseReader\ExpenseReaderFailed;
+use App\Tax\Period;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,8 +29,9 @@ class ExpenseController extends Controller
         ]);
         $search = trim($filters['search'] ?? '');
         $category = $filters['category'] ?? null;
+        $period = Period::fromRequest($request, Period::Lifetime);
 
-        $query = Expense::query()
+        $query = $period->apply(Expense::query(), 'date')
             ->when($search, fn ($query) => $query->where(fn ($query) => $query
                 ->where('supplier', 'like', "%{$search}%")
                 ->orWhere('reference', 'like', "%{$search}%")
@@ -46,7 +48,8 @@ class ExpenseController extends Controller
                 'total' => (int) (clone $query)->sum('total'),
                 'vat' => (int) (clone $query)->sum('vat_amount'),
             ],
-            'filters' => ['search' => $search, 'category' => $category ?? ''],
+            'filters' => ['search' => $search, 'category' => $category ?? '', 'period' => $period->value],
+            'periods' => Period::options(),
             'categories' => ExpenseCategory::options(),
         ]);
     }

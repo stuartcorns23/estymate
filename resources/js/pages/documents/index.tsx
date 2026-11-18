@@ -1,12 +1,13 @@
 import DocumentStatusBadge from '@/components/document-status-badge';
 import PageHeader from '@/components/page-header';
 import Pagination from '@/components/pagination';
+import PeriodFilter, { periodParam } from '@/components/period-filter';
 import SearchInput from '@/components/search-input';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatMoney } from '@/lib/money';
 import { cn } from '@/lib/utils';
-import { type BreadcrumbItem, type DocumentSummary, type DocumentTypeInfo, type Paginated, type SharedData } from '@/types';
+import { type BreadcrumbItem, type DocumentSummary, type DocumentTypeInfo, type Option, type Paginated, type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { FileUp, Plus } from 'lucide-react';
 
@@ -39,10 +40,12 @@ const statusFilters: Record<DocumentTypeInfo['value'], { value: string; label: s
 interface DocumentsIndexProps {
     type: DocumentTypeInfo;
     documents: Paginated<DocumentSummary>;
-    filters: { status: string; search: string };
+    filters: { status: string; search: string; period: string };
+    periods: Option[];
 }
 
-export default function DocumentsIndex({ type, documents, filters }: DocumentsIndexProps) {
+export default function DocumentsIndex({ type, documents, filters, periods }: DocumentsIndexProps) {
+    const period = periodParam(filters.period, 'all');
     const title = `${type.label}s`;
     const breadcrumbs: BreadcrumbItem[] = [{ title, href: `/${type.plural}` }];
     const isInvoice = type.value === 'invoice';
@@ -91,13 +94,23 @@ export default function DocumentsIndex({ type, documents, filters }: DocumentsIn
                     <SearchInput
                         value={filters.search}
                         placeholder={`Search ${title.toLowerCase()}`}
-                        params={filters.status ? { status: filters.status } : {}}
+                        params={{ ...(filters.status ? { status: filters.status } : {}), ...(period ? { period } : {}) }}
+                    />
+                    <PeriodFilter
+                        value={filters.period}
+                        periods={periods}
+                        defaultValue="all"
+                        params={{ status: filters.status || undefined, search: filters.search || undefined }}
                     />
                     <nav className="flex flex-wrap gap-1">
                         {statusFilters[type.value].map((filter) => (
                             <Link
                                 key={filter.value}
-                                href={route(`${type.plural}.index`, { status: filter.value || undefined, search: filters.search || undefined })}
+                                href={route(`${type.plural}.index`, {
+                                    status: filter.value || undefined,
+                                    search: filters.search || undefined,
+                                    period,
+                                })}
                                 className={cn(
                                     'rounded-md px-3 py-1.5 text-sm',
                                     filters.status === filter.value ? 'bg-muted font-medium' : 'text-muted-foreground hover:text-foreground',
@@ -112,7 +125,7 @@ export default function DocumentsIndex({ type, documents, filters }: DocumentsIn
 
                 {documents.data.length === 0 ? (
                     <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
-                        {filters.search || filters.status ? `No ${title.toLowerCase()} match.` : `No ${title.toLowerCase()} yet.`}
+                        {filters.search || filters.status || period ? `No ${title.toLowerCase()} match.` : `No ${title.toLowerCase()} yet.`}
                     </div>
                 ) : (
                     <div className="overflow-x-auto rounded-lg border">

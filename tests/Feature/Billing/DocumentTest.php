@@ -10,6 +10,7 @@ use App\Models\Document;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class DocumentTest extends TestCase
@@ -62,6 +63,22 @@ class DocumentTest extends TestCase
         foreach (['/estimates', '/estimates/create', '/invoices', '/invoices/create', "/invoices/{$invoice->id}", "/invoices/{$invoice->id}/edit"] as $url) {
             $this->get($url)->assertOk();
         }
+    }
+
+    public function test_lists_filter_by_tax_year()
+    {
+        $this->travelTo('2026-11-17');
+
+        foreach (['2026-04-06', '2026-04-05', '2025-04-06', '2024-12-01'] as $date) {
+            $this->post('/invoices', $this->payload(['issue_date' => $date, 'due_date' => $date]))->assertSessionHasNoErrors();
+        }
+
+        $this->get('/invoices')->assertInertia(fn (Assert $page) => $page->where('filters.period', 'all')->has('documents.data', 4));
+        $this->get('/invoices?period=current')->assertInertia(fn (Assert $page) => $page
+            ->has('documents.data', 1)
+            ->where('documents.data.0.issue_date', '2026-04-06'));
+        $this->get('/invoices?period=previous')->assertInertia(fn (Assert $page) => $page->has('documents.data', 2));
+        $this->get('/estimates?period=current')->assertInertia(fn (Assert $page) => $page->has('documents.data', 0)->has('periods', 3));
     }
 
     public function test_invoices_are_created_with_vat_totals_in_pence()
