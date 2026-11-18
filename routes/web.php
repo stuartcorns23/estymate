@@ -12,6 +12,7 @@ use App\Http\Controllers\DocumentActionController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\InvoiceImportController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PublicDocumentController;
@@ -61,6 +62,11 @@ Route::middleware(['auth', 'business'])->group(function () {
     Route::get('tax-return/csv', [TaxReturnController::class, 'csv'])->name('tax-return.csv');
     Route::get('tax-return/pdf', [TaxReturnController::class, 'pdf'])->name('tax-return.pdf');
     Route::resource('recurring-invoices', RecurringInvoiceController::class)->only(['index', 'update', 'destroy']);
+
+    // Before the invoice routes, so "import" isn't taken for an invoice.
+    Route::get('invoices/import', [InvoiceImportController::class, 'create'])->name('invoices.import');
+    Route::post('invoices/import/preview', [InvoiceImportController::class, 'preview'])->name('invoices.import.preview');
+    Route::post('invoices/import', [InvoiceImportController::class, 'store'])->name('invoices.import.store');
 
     // Estimates and invoices share one controller; the "type" default tells it which.
     foreach (DocumentType::cases() as $type) {

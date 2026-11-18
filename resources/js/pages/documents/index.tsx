@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatMoney } from '@/lib/money';
 import { cn } from '@/lib/utils';
-import { type BreadcrumbItem, type DocumentSummary, type DocumentTypeInfo, type Paginated } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { type BreadcrumbItem, type DocumentSummary, type DocumentTypeInfo, type Paginated, type SharedData } from '@/types';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { FileUp, Plus } from 'lucide-react';
 
 const statusFilters: Record<DocumentTypeInfo['value'], { value: string; label: string }[]> = {
     estimate: [
@@ -39,6 +39,7 @@ export default function DocumentsIndex({ type, documents, filters }: DocumentsIn
     const title = `${type.label}s`;
     const breadcrumbs: BreadcrumbItem[] = [{ title, href: `/${type.plural}` }];
     const isInvoice = type.value === 'invoice';
+    const { flash } = usePage<SharedData & { flash?: { status?: string } }>().props;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -48,13 +49,28 @@ export default function DocumentsIndex({ type, documents, filters }: DocumentsIn
                 <PageHeader
                     title={title}
                     actions={
-                        <Button asChild>
-                            <Link href={route(`${type.plural}.create`)}>
-                                <Plus /> New {type.label.toLowerCase()}
-                            </Link>
-                        </Button>
+                        <>
+                            {isInvoice && (
+                                <Button variant="outline" asChild>
+                                    <Link href={route('invoices.import')}>
+                                        <FileUp /> Import
+                                    </Link>
+                                </Button>
+                            )}
+                            <Button asChild>
+                                <Link href={route(`${type.plural}.create`)}>
+                                    <Plus /> New {type.label.toLowerCase()}
+                                </Link>
+                            </Button>
+                        </>
                     }
                 />
+
+                {flash?.status && (
+                    <p className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900 dark:border-green-900 dark:bg-green-950 dark:text-green-100">
+                        {flash.status}
+                    </p>
+                )}
 
                 <div className="flex flex-wrap items-center gap-4">
                     <SearchInput
