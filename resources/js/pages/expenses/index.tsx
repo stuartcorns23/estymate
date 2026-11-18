@@ -1,5 +1,6 @@
 import PageHeader from '@/components/page-header';
 import Pagination from '@/components/pagination';
+import PeriodFilter, { periodParam } from '@/components/period-filter';
 import SearchInput from '@/components/search-input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,18 +15,20 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Expenses', href: '/expenses' }]
 interface ExpensesIndexProps {
     expenses: Paginated<Expense>;
     totals: { total: number; vat: number };
-    filters: { search: string; category: string };
+    filters: { search: string; category: string; period: string };
     categories: Option[];
+    periods: Option[];
 }
 
-export default function ExpensesIndex({ expenses, totals, filters, categories }: ExpensesIndexProps) {
+export default function ExpensesIndex({ expenses, totals, filters, categories, periods }: ExpensesIndexProps) {
     const labels = Object.fromEntries(categories.map((category) => [category.value, category.label]));
-    const filtered = Boolean(filters.search || filters.category);
+    const period = periodParam(filters.period, 'all');
+    const filtered = Boolean(filters.search || filters.category || period);
 
     const filterCategory = (category: string) => {
         router.get(
             route('expenses.index'),
-            { search: filters.search || undefined, category: category === 'all' ? undefined : category },
+            { search: filters.search || undefined, category: category === 'all' ? undefined : category, period },
             { preserveState: true, replace: true },
         );
     };
@@ -51,7 +54,13 @@ export default function ExpensesIndex({ expenses, totals, filters, categories }:
                     <SearchInput
                         value={filters.search}
                         placeholder="Search suppliers or references"
-                        params={filters.category ? { category: filters.category } : {}}
+                        params={{ ...(filters.category ? { category: filters.category } : {}), ...(period ? { period } : {}) }}
+                    />
+                    <PeriodFilter
+                        value={filters.period}
+                        periods={periods}
+                        defaultValue="all"
+                        params={{ search: filters.search || undefined, category: filters.category || undefined }}
                     />
                     <Select value={filters.category || 'all'} onValueChange={filterCategory}>
                         <SelectTrigger className="w-56" aria-label="Category">

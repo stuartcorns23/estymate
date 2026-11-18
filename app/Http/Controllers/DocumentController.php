@@ -12,6 +12,7 @@ use App\Models\Client;
 use App\Models\Document;
 use App\Models\Payment;
 use App\Models\Product;
+use App\Tax\Period;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -28,8 +29,9 @@ class DocumentController extends Controller
         $type = $this->type($request);
         $status = $request->string('status')->value();
         $search = $request->string('search')->trim()->value();
+        $period = Period::fromRequest($request, Period::Lifetime);
 
-        $documents = Document::ofType($type)
+        $documents = $period->apply(Document::ofType($type), 'issue_date')
             ->with('client:id,name')
             ->when($status === 'overdue', fn ($query) => $query
                 ->where('status', DocumentStatus::Sent)
@@ -49,7 +51,8 @@ class DocumentController extends Controller
         return Inertia::render('documents/index', [
             'type' => $this->typeProps($type),
             'documents' => $documents,
-            'filters' => ['status' => $status, 'search' => $search],
+            'filters' => ['status' => $status, 'search' => $search, 'period' => $period->value],
+            'periods' => Period::options(),
         ]);
     }
 

@@ -147,16 +147,50 @@ class ExpenseTest extends TestCase
         $invoice = $this->createInvoice();
         Payment::forceCreate(['business_id' => $business, 'document_id' => $invoice, 'amount' => 8000, 'paid_on' => '2026-10-05', 'method' => 'bank_transfer']);
 
+        // 2026-11-17 is in the 2026-27 tax year, which runs 6 April 2026 to 5 April 2027.
         $this->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-            ->where('totals.spent_this_month', 3000)
+            ->where('period', 'current')
+            ->where('totals.spent', 6000)
+            ->where('totals.paid', 8000)
             ->has('cashflow', 12)
-            ->where('cashflow.0.month', '2025-12')
-            ->where('cashflow.10', ['month' => '2026-10', 'income' => 8000, 'expenses' => 3000])
-            ->where('cashflow.11', ['month' => '2026-11', 'income' => 0, 'expenses' => 3000])
+            ->where('cashflow.0.key', '2026-04')
+            ->where('cashflow.6', ['key' => '2026-10', 'label' => 'Oct', 'title' => 'October 2026', 'income' => 8000, 'expenses' => 3000])
+            ->where('cashflow.7', ['key' => '2026-11', 'label' => 'Nov', 'title' => 'November 2026', 'income' => 0, 'expenses' => 3000])
+            ->where('cashflow.11.key', '2027-03')
             ->where('expenseCategories', [
                 ['category' => 'travel', 'label' => 'Travel', 'total' => 5000],
                 ['category' => 'software', 'label' => 'Software & subscriptions', 'total' => 1000],
             ]));
+
+        $this->get('/dashboard?period=previous')->assertInertia(fn (Assert $page) => $page
+            ->where('totals.spent', 99999)
+            ->where('totals.paid', 0)
+            ->where('cashflow.6', ['key' => '2025-10', 'label' => 'Oct', 'title' => 'October 2025', 'income' => 0, 'expenses' => 99999]));
+
+        $this->get('/dashboard?period=all')->assertInertia(fn (Assert $page) => $page
+            ->where('totals.spent', 105999)
+            ->where('cashflow', [
+                ['key' => '2025', 'label' => '2025-26', 'title' => '2025-26 tax year', 'income' => 0, 'expenses' => 99999],
+                ['key' => '2026', 'label' => '2026-27', 'title' => '2026-27 tax year', 'income' => 8000, 'expenses' => 6000],
+            ]));
+    }
+
+    public function test_index_filters_by_tax_year()
+    {
+        $this->travelTo('2026-11-17');
+        $user = User::factory()->withBusiness()->create();
+        $business = $user->current_business_id;
+        Expense::factory()->create(['business_id' => $business, 'date' => '2026-04-06', 'total' => 100]);
+        Expense::factory()->create(['business_id' => $business, 'date' => '2026-04-05', 'total' => 200]);
+        Expense::factory()->create(['business_id' => $business, 'date' => '2025-04-06', 'total' => 400]);
+        Expense::factory()->create(['business_id' => $business, 'date' => '2025-04-05', 'total' => 800]);
+
+        $this->actingAs($user);
+        $this->get('/expenses')->assertInertia(fn (Assert $page) => $page
+            ->where('filters.period', 'all')->where('totals.total', 1500)->has('periods', 3));
+        $this->get('/expenses?period=current')->assertInertia(fn (Assert $page) => $page->where('totals.total', 100));
+        $this->get('/expenses?period=previous')->assertInertia(fn (Assert $page) => $page->where('totals.total', 600));
+        $this->get('/expenses?period=nonsense')->assertInertia(fn (Assert $page) => $page->where('totals.total', 1500));
     }
 
     private function createInvoice(): int

@@ -116,7 +116,7 @@ class GettingPaidTest extends TestCase
             ->component('dashboard')
             ->where('totals.outstanding', 12000 + 10000)
             ->where('totals.overdue', 10000)
-            ->where('totals.paid_this_month', 2000)
+            ->where('totals.paid', 2000)
             ->has('overdueInvoices', 1));
     }
 
