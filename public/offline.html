@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#071B49" />
+        <title>Offline - Estymate</title>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <style>
+            :root {
+                color-scheme: dark;
+            }
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 24px;
+                background: #071b49;
+                color: #ffffff;
+                font-family:
+                    'Instrument Sans',
+                    ui-sans-serif,
+                    system-ui,
+                    -apple-system,
+                    'Segoe UI',
+                    sans-serif;
+                text-align: center;
+            }
+            main {
+                max-width: 360px;
+            }
+            img {
+                width: 72px;
+                height: 72px;
+                margin-bottom: 24px;
+            }
+            h1 {
+                margin: 0 0 8px;
+                font-size: 1.5rem;
+                font-weight: 600;
+            }
+            p {
+                margin: 0 0 24px;
+                color: #c9d3ea;
+                line-height: 1.5;
+            }
+            button {
+                appearance: none;
+                border: 0;
+                border-radius: 8px;
+                padding: 12px 20px;
+                background: #10cfc3;
+                color: #071b49;
+                font: inherit;
+                font-weight: 600;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <img src="/favicon.svg" alt="" />
+            <h1>You're offline</h1>
+            <p>Estymate needs an internet connection to load your invoices and clients. Check your signal or Wi-Fi, then try again.</p>
+            <button type="button" onclick="window.location.reload()">Try again</button>
+        </main>
+        <script>
+            window.addEventListener('online', () => window.location.reload());
+        </script>
+    </body>
+</html>

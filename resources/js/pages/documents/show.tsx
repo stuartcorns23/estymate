@@ -812,8 +812,8 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                                     <th className={`py-2 text-right font-medium ${showsPrices ? 'pr-4' : ''}`}>Qty</th>
                                     {showsPrices && (
                                         <>
-                                            <th className="py-2 pr-4 text-right font-medium">Price</th>
-                                            <th className="py-2 pr-4 text-right font-medium">VAT</th>
+                                            <th className="hidden py-2 pr-4 text-right font-medium sm:table-cell">Price</th>
+                                            <th className="hidden py-2 pr-4 text-right font-medium sm:table-cell">VAT</th>
                                             <th className="py-2 text-right font-medium">Amount</th>
                                         </>
                                     )}
@@ -828,8 +828,10 @@ export default function ShowDocument({ type, document, statuses, paymentMethods,
                                         </td>
                                         {showsPrices && (
                                             <>
-                                                <td className="py-3 pr-4 text-right tabular-nums">{money(item.unit_price)}</td>
-                                                <td className="py-3 pr-4 text-right tabular-nums">{formatRate(item.tax_rate)}</td>
+                                                <td className="hidden py-3 pr-4 text-right tabular-nums sm:table-cell">{money(item.unit_price)}</td>
+                                                <td className="hidden py-3 pr-4 text-right tabular-nums sm:table-cell">
+                                                    {formatRate(item.tax_rate)}
+                                                </td>
                                                 <td className="py-3 text-right tabular-nums">{money(item.net_amount)}</td>
                                             </>
                                         )}

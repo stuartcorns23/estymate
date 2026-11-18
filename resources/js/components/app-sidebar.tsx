@@ -1,4 +1,5 @@
 import { BusinessSwitcher } from '@/components/business-switcher';
+import { InstallApp } from '@/components/install-app';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { PlanBadge } from '@/components/plan-badge';
@@ -96,6 +97,7 @@ export function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
+                <InstallApp />
                 <PlanBadge />
                 <NavUser />
             </SidebarFooter>

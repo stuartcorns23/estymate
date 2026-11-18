@@ -282,8 +282,9 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                         </div>
 
                         {data.items.map((item, index) => (
-                            <div key={index} className={`grid gap-2 rounded-lg border p-3 md:items-start md:border-0 md:p-0 ${lineGrid}`}>
-                                <div>
+                            <div key={index} className={`grid grid-cols-2 gap-2 rounded-lg border p-3 md:items-start md:border-0 md:p-0 ${lineGrid}`}>
+                                <div className="col-span-2 md:col-span-1">
+                                    <LineLabel>Description</LineLabel>
                                     <Textarea
                                         aria-label="Description"
                                         rows={1}
@@ -295,6 +296,7 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                                     <InputError message={errorFor(`items.${index}.description`)} />
                                 </div>
                                 <div>
+                                    <LineLabel>Qty</LineLabel>
                                     <Input
                                         aria-label="Quantity"
                                         inputMode="decimal"
@@ -303,15 +305,19 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                                     />
                                     <InputError message={errorFor(`items.${index}.quantity`)} />
                                 </div>
-                                <Input
-                                    aria-label="Unit"
-                                    value={item.unit}
-                                    onChange={(e) => updateLine(index, { unit: e.target.value })}
-                                    placeholder="hours"
-                                />
+                                <div>
+                                    <LineLabel>Unit</LineLabel>
+                                    <Input
+                                        aria-label="Unit"
+                                        value={item.unit}
+                                        onChange={(e) => updateLine(index, { unit: e.target.value })}
+                                        placeholder="hours"
+                                    />
+                                </div>
                                 {showsPrices && (
                                     <>
                                         <div>
+                                            <LineLabel>Price (£)</LineLabel>
                                             <Input
                                                 aria-label="Unit price"
                                                 inputMode="decimal"
@@ -322,6 +328,7 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                                             <InputError message={errorFor(`items.${index}.unit_price`)} />
                                         </div>
                                         <div>
+                                            <LineLabel>VAT</LineLabel>
                                             <Select value={item.tax_rate} onValueChange={(value) => updateLine(index, { tax_rate: value })}>
                                                 <SelectTrigger aria-label="VAT rate">
                                                     <SelectValue />
@@ -336,7 +343,8 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                                             </Select>
                                             <InputError message={errorFor(`items.${index}.tax_rate`)} />
                                         </div>
-                                        <div className="flex h-10 items-center justify-end text-sm tabular-nums">
+                                        <div className="flex h-10 items-center gap-2 text-sm tabular-nums md:justify-end">
+                                            <span className="text-muted-foreground text-xs font-medium md:hidden">Amount</span>
                                             {formatMoney(lineAmounts(item).net)}
                                         </div>
                                     </>
@@ -345,6 +353,7 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                                     type="button"
                                     variant="ghost"
                                     size="icon"
+                                    className="justify-self-end"
                                     aria-label="Remove line"
                                     disabled={data.items.length === 1}
                                     onClick={() =>
@@ -405,4 +414,9 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
             </form>
         </AppLayout>
     );
+}
+
+/** Field labels for a line on phones, where the column headings are hidden. */
+function LineLabel({ children }: { children: React.ReactNode }) {
+    return <span className="text-muted-foreground mb-1 block text-xs font-medium md:hidden">{children}</span>;
 }
