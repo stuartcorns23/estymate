@@ -5,7 +5,7 @@ import { PlanBadge } from '@/components/plan-badge';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { Calculator, FileText, LayoutGrid, MessageCircle, Package, Receipt, Repeat, Users, Wallet } from 'lucide-react';
+import { Calculator, FileClock, FileText, LayoutGrid, MessageCircle, Package, Receipt, Repeat, Users, Wallet } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -23,6 +23,11 @@ const mainNavItems: NavItem[] = [
         title: 'Invoices',
         url: '/invoices',
         icon: Receipt,
+    },
+    {
+        title: 'Pro-formas',
+        url: '/proformas',
+        icon: FileClock,
     },
     {
         title: 'Recurring',

@@ -23,6 +23,8 @@ class PublicDocumentController extends Controller
         return Inertia::render('public/document', [
             'document' => [
                 'type' => $document->type->label(),
+                'requests_payment' => $document->type->requestsPayment(),
+                'is_pro_forma' => $document->type === DocumentType::ProForma,
                 'number' => $document->number,
                 'status' => $document->status->value,
                 'is_overdue' => $document->isOverdue(),

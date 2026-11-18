@@ -37,6 +37,9 @@ class DocumentPdf
             'design' => $design,
             'preview' => $preview,
             'isInvoice' => $document->type === DocumentType::Invoice,
+            'isProForma' => $document->type === DocumentType::ProForma,
+            // Invoices and pro-formas ask for payment by a due date; estimates are valid until one.
+            'requestsPayment' => $document->type->requestsPayment(),
             'money' => fn (int $pence) => Money::format($pence, $document->currency),
             'number' => fn ($value) => rtrim(rtrim((string) $value, '0'), '.'),
             'businessAddress' => array_values(array_filter([

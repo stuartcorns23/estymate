@@ -1,11 +1,11 @@
-{{-- Dates and reference, as label/value rows. A UK VAT invoice must show its tax point. --}}
+{{-- Dates and reference, as label/value rows. A UK VAT invoice must show its tax point; a pro-forma has none. --}}
 @php
     $rows = [[$isInvoice ? 'Invoice date' : 'Date', $document->issue_date->format('j M Y')]];
     if ($isInvoice) {
         $rows[] = ['Tax point', $document->issue_date->format('j M Y')];
     }
     if ($document->due_date) {
-        $rows[] = [$isInvoice ? 'Due date' : 'Valid until', $document->due_date->format('j M Y')];
+        $rows[] = [$isInvoice ? 'Due date' : ($requestsPayment ? 'Payment due' : 'Valid until'), $document->due_date->format('j M Y')];
     }
     if ($document->reference) {
         $rows[] = ['Reference', $document->reference];

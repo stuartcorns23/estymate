@@ -30,10 +30,10 @@
             </td>
             <td style="width: 42%">
                 <div class="due">
-                    <div class="due-label">{{ $isInvoice ? 'Amount due' : 'Estimate total' }}</div>
+                    <div class="due-label">{{ $requestsPayment ? 'Amount due' : 'Estimate total' }}</div>
                     <div class="due-amount">{{ $money($isInvoice ? $document->balanceDue() : $document->total) }}</div>
                     @if ($document->due_date)
-                        <div>{{ $isInvoice ? 'Due' : 'Valid until' }} {{ $document->due_date->format('j M Y') }}</div>
+                        <div>{{ $requestsPayment ? 'Due' : 'Valid until' }} {{ $document->due_date->format('j M Y') }}</div>
                     @endif
                 </div>
             </td>

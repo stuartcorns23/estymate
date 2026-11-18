@@ -12,7 +12,10 @@ export interface PlanInfo {
     name: string;
     price: number;
     yearly_price: number;
-    limits: Record<'clients' | 'invoices_per_month' | 'estimates_per_month' | 'team_members' | 'assistant_messages_per_month', number | null>;
+    limits: Record<
+        'clients' | 'invoices_per_month' | 'estimates_per_month' | 'proformas_per_month' | 'team_members' | 'assistant_messages_per_month',
+        number | null
+    >;
     features?: Partial<Record<'tax_return', boolean>>;
     purchasable: boolean;
     yearly_purchasable: boolean;
@@ -39,6 +42,7 @@ export interface Business extends BusinessSummary {
     currency: string;
     estimate_prefix: string;
     invoice_prefix: string;
+    proforma_prefix: string;
     payment_terms_days: number;
     payment_details: string | null;
     send_reminders: boolean;
@@ -127,9 +131,10 @@ export interface Product {
 export type DocumentStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'invoiced' | 'paid' | 'void';
 
 export interface DocumentTypeInfo {
-    value: 'estimate' | 'invoice';
+    value: 'estimate' | 'invoice' | 'proforma';
     label: string;
     plural: string;
+    converts_to_invoice: boolean;
 }
 
 export interface DocumentSummary {

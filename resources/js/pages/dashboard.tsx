@@ -28,7 +28,7 @@ interface DashboardProps {
     expenseCategories: { category: string; label: string; total: number }[];
     overdueInvoices: Row[];
     openEstimates: Row[];
-    usage: { clients: number; estimates_this_month: number; invoices_this_month: number };
+    usage: { clients: number; estimates_this_month: number; invoices_this_month: number; proformas_this_month: number };
 }
 
 function Stat({ label, value, href, tone }: { label: string; value: string; href: string; tone?: 'danger' }) {
@@ -239,7 +239,8 @@ export default function Dashboard({ totals, overdueInvoices, openEstimates, usag
                 </div>
 
                 <p className="text-muted-foreground text-xs">
-                    This month: {usage.invoices_this_month} invoices and {usage.estimates_this_month} estimates created · {usage.clients} clients
+                    This month: {usage.invoices_this_month} invoices, {usage.proformas_this_month} pro-formas and {usage.estimates_this_month}{' '}
+                    estimates created · {usage.clients} clients
                 </p>
             </div>
         </AppLayout>

@@ -67,7 +67,7 @@ function lineAmounts(item: LineItem) {
 }
 
 export default function DocumentForm({ type, clients, products, taxRates, document }: DocumentFormProps) {
-    const isInvoice = type.value === 'invoice';
+    const requestsPayment = type.value !== 'estimate';
     const label = type.label.toLowerCase();
     const defaultRate = taxRates.find((rate) => rate.is_default)?.rate ?? taxRates[0]?.rate ?? '0.00';
     const title = document.id ? `Edit ${label} ${document.number}` : `New ${label}`;
@@ -176,7 +176,7 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="due_date">{isInvoice ? 'Due date' : 'Valid until'}</Label>
+                        <Label htmlFor="due_date">{requestsPayment ? 'Due date' : 'Valid until'}</Label>
                         <Input id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} />
                         <InputError message={errors.due_date} />
                     </div>
@@ -316,7 +316,7 @@ export default function DocumentForm({ type, clients, products, taxRates, docume
                         rows={4}
                         value={data.notes}
                         onChange={(e) => setData('notes', e.target.value)}
-                        placeholder={isInvoice ? 'Payment details, thank-you note' : 'Scope, terms or anything the client should know'}
+                        placeholder={requestsPayment ? 'Payment details, thank-you note' : 'Scope, terms or anything the client should know'}
                     />
                     <InputError message={errors.notes} />
                 </div>

@@ -68,7 +68,7 @@ Route::middleware(['auth', 'business'])->group(function () {
     Route::post('invoices/import/preview', [InvoiceImportController::class, 'preview'])->name('invoices.import.preview');
     Route::post('invoices/import', [InvoiceImportController::class, 'store'])->name('invoices.import.store');
 
-    // Estimates and invoices share one controller; the "type" default tells it which.
+    // Estimates, invoices and pro-forma invoices share one controller; the "type" default tells it which.
     foreach (DocumentType::cases() as $type) {
         Route::prefix($type->plural())->name("{$type->plural()}.")->group(function () use ($type) {
             $routes = [
@@ -84,7 +84,7 @@ Route::middleware(['auth', 'business'])->group(function () {
                 Route::post('{document}/send', [DocumentActionController::class, 'send'])->name('send'),
             ];
 
-            if ($type === DocumentType::Estimate) {
+            if ($type->convertsToInvoice()) {
                 $routes[] = Route::post('{document}/convert', [DocumentActionController::class, 'convert'])->name('convert');
             }
 

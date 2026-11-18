@@ -19,7 +19,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Handles estimates and invoices. The route's "type" default says which.
+ * Handles estimates, invoices and pro-forma invoices. The route's "type" default says which.
  */
 class DocumentController extends Controller
 {
@@ -65,9 +65,9 @@ class DocumentController extends Controller
             'document' => [
                 'client_id' => $source?->id,
                 'issue_date' => today()->toDateString(),
-                'due_date' => today()->addDays($type === DocumentType::Invoice ? $business->payment_terms_days : 30)->toDateString(),
+                'due_date' => today()->addDays($type->requestsPayment() ? $business->payment_terms_days : 30)->toDateString(),
                 'reference' => '',
-                'notes' => $type === DocumentType::Invoice ? ($business->payment_details ?? '') : '',
+                'notes' => $type->requestsPayment() ? ($business->payment_details ?? '') : '',
                 'items' => [],
             ],
         ]);
@@ -189,7 +189,7 @@ class DocumentController extends Controller
             'status' => ['required', Rule::in(array_map(fn ($status) => $status->value, $type->manualStatuses()))],
         ]);
 
-        abort_if($document->status === DocumentStatus::Invoiced, 403, 'This estimate has already been invoiced.');
+        abort_if($document->status === DocumentStatus::Invoiced, 403, 'This document has already been invoiced.');
         abort_if($document->amount_paid > 0, 403, 'Remove the payments on this invoice before changing its status.');
 
         $document->status = DocumentStatus::from($validated['status']);
@@ -219,11 +219,16 @@ class DocumentController extends Controller
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, string|bool>
      */
     private function typeProps(DocumentType $type): array
     {
-        return ['value' => $type->value, 'label' => $type->label(), 'plural' => $type->plural()];
+        return [
+            'value' => $type->value,
+            'label' => $type->label(),
+            'plural' => $type->plural(),
+            'converts_to_invoice' => $type->convertsToInvoice(),
+        ];
     }
 
     /**
@@ -274,6 +279,7 @@ class DocumentController extends Controller
     {
         return [
             'number' => $document->number,
+            'label' => strtolower($document->type->label()),
             'url' => route("{$document->type->plural()}.show", $document),
         ];
     }

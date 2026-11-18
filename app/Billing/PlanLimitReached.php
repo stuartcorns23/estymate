@@ -21,6 +21,7 @@ class PlanLimitReached extends Exception
             'clients' => "{$this->plan->limit('clients')} clients",
             'invoices_per_month' => "{$this->plan->limit('invoices_per_month')} invoices a month",
             'estimates_per_month' => "{$this->plan->limit('estimates_per_month')} estimates a month",
+            'proformas_per_month' => "{$this->plan->limit('proformas_per_month')} pro-forma invoices a month",
             'team_members' => "{$this->plan->limit('team_members')} team members",
             'assistant_messages_per_month' => "{$this->plan->limit('assistant_messages_per_month')} assistant questions a month",
             default => 'this feature',

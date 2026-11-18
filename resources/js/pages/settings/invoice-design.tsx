@@ -355,6 +355,9 @@ export default function InvoiceDesign({
                                 <ToggleGroupItem value="invoice" className="px-3">
                                     Invoice
                                 </ToggleGroupItem>
+                                <ToggleGroupItem value="proforma" className="px-3">
+                                    Pro-forma
+                                </ToggleGroupItem>
                                 <ToggleGroupItem value="estimate" className="px-3">
                                     Estimate
                                 </ToggleGroupItem>

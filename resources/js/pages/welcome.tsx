@@ -67,6 +67,7 @@ export default function Welcome({ plans, trialDays }: { plans: PlanInfo[]; trial
                                     <li>{limit(plan.limits.clients, 'clients')}</li>
                                     <li>{limit(plan.limits.invoices_per_month, 'invoices a month')}</li>
                                     <li>{limit(plan.limits.estimates_per_month, 'estimates a month')}</li>
+                                    <li>{limit(plan.limits.proformas_per_month, 'pro-forma invoices a month')}</li>
                                     <li>{limit(plan.limits.assistant_messages_per_month, 'assistant questions a month')}</li>
                                     <li>{limit(plan.limits.team_members, plan.limits.team_members === 1 ? 'user' : 'users')}</li>
                                     {plan.features?.tax_return && <li>Tax return figures</li>}

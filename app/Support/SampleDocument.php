@@ -46,12 +46,12 @@ class SampleDocument
 
         $document = new Document([
             'issue_date' => now()->startOfDay(),
-            'due_date' => now()->startOfDay()->addDays($type === DocumentType::Invoice ? $business->payment_terms_days : 30),
+            'due_date' => now()->startOfDay()->addDays($type->requestsPayment() ? $business->payment_terms_days : 30),
             'reference' => 'PO-2291',
-            'notes' => $type === DocumentType::Invoice ? $business->payment_details : 'This estimate is valid for 30 days.',
+            'notes' => $type->requestsPayment() ? $business->payment_details : 'This estimate is valid for 30 days.',
         ]);
 
-        $prefix = $type === DocumentType::Estimate ? $business->estimate_prefix : $business->invoice_prefix;
+        $prefix = $business->documentPrefix($type);
 
         $document->forceFill([
             'type' => $type,

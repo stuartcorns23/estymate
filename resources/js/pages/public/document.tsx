@@ -9,6 +9,8 @@ import { useState } from 'react';
 interface PublicDocumentProps {
     document: {
         type: string;
+        requests_payment: boolean;
+        is_pro_forma: boolean;
         number: string;
         status: DocumentStatus;
         is_overdue: boolean;
@@ -34,7 +36,7 @@ interface PublicDocumentProps {
 export default function PublicDocument({ document, justPaid }: PublicDocumentProps) {
     const [paying, setPaying] = useState(false);
     const money = (pence: number) => formatMoney(pence, document.currency);
-    const isInvoice = document.type === 'Invoice';
+    const requestsPayment = document.requests_payment;
 
     const pay = () => {
         setPaying(true);
@@ -74,10 +76,18 @@ export default function PublicDocument({ document, justPaid }: PublicDocumentPro
                         </div>
                     )}
 
+                    {document.is_pro_forma && (
+                        <p className="text-muted-foreground rounded-lg border p-4 text-sm">
+                            This is a pro-forma invoice, not a VAT invoice. A full invoice will be issued once payment is received.
+                        </p>
+                    )}
+
                     <div className="bg-card space-y-8 rounded-xl border p-6 shadow-xs">
                         <div className="flex flex-wrap justify-between gap-6 text-sm">
                             <div>
-                                <p className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">{isInvoice ? 'Bill to' : 'Prepared for'}</p>
+                                <p className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">
+                                    {requestsPayment ? 'Bill to' : 'Prepared for'}
+                                </p>
                                 <p className="font-medium">{document.client_name}</p>
                             </div>
                             <dl className="grid grid-cols-2 gap-x-6 gap-y-1">
@@ -85,7 +95,7 @@ export default function PublicDocument({ document, justPaid }: PublicDocumentPro
                                 <dd className="text-right">{formatDate(document.issue_date)}</dd>
                                 {document.due_date && (
                                     <>
-                                        <dt className="text-muted-foreground">{isInvoice ? 'Due' : 'Valid until'}</dt>
+                                        <dt className="text-muted-foreground">{requestsPayment ? 'Due' : 'Valid until'}</dt>
                                         <dd className="text-right">{formatDate(document.due_date)}</dd>
                                     </>
                                 )}

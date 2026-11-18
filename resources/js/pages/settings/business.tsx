@@ -41,6 +41,7 @@ export default function BusinessSettings({ business, taxRates, canUpdate }: { bu
         vat_number: business.vat_number ?? '',
         company_number: business.company_number ?? '',
         estimate_prefix: business.estimate_prefix,
+        proforma_prefix: business.proforma_prefix,
         invoice_prefix: business.invoice_prefix,
         payment_terms_days: String(business.payment_terms_days),
         payment_details: business.payment_details ?? '',
@@ -66,7 +67,7 @@ export default function BusinessSettings({ business, taxRates, canUpdate }: { bu
 
                         <HeadingSmall title="Estimates and invoices" description="Numbering and payment terms for new documents" />
 
-                        <div className="grid gap-6 sm:grid-cols-3">
+                        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="estimate_prefix">Estimate prefix</Label>
                                 <Input
@@ -86,6 +87,16 @@ export default function BusinessSettings({ business, taxRates, canUpdate }: { bu
                                     disabled={!canUpdate || processing}
                                 />
                                 <InputError message={errors.invoice_prefix} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="proforma_prefix">Pro-forma prefix</Label>
+                                <Input
+                                    id="proforma_prefix"
+                                    value={data.proforma_prefix}
+                                    onChange={(e) => setData('proforma_prefix', e.target.value)}
+                                    disabled={!canUpdate || processing}
+                                />
+                                <InputError message={errors.proforma_prefix} />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="payment_terms_days">Payment terms (days)</Label>

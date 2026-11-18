@@ -49,6 +49,7 @@ class Business extends Model
         'currency',
         'estimate_prefix',
         'invoice_prefix',
+        'proforma_prefix',
         'payment_terms_days',
         'payment_details',
         'send_reminders',
@@ -171,7 +172,7 @@ class Business extends Model
     public function claimDocumentNumber(DocumentType $type): string
     {
         $column = "next_{$type->value}_number";
-        $prefix = $type === DocumentType::Estimate ? $this->estimate_prefix : $this->invoice_prefix;
+        $prefix = $this->documentPrefix($type);
 
         $next = (int) static::whereKey($this->id)->lockForUpdate()->value($column);
         static::whereKey($this->id)->update([$column => $next + 1]);
@@ -181,11 +182,19 @@ class Business extends Model
     }
 
     /**
+     * The numbering prefix for a type of document, e.g. "INV-".
+     */
+    public function documentPrefix(DocumentType $type): string
+    {
+        return (string) $this->{"{$type->value}_prefix"};
+    }
+
+    /**
      * How much the business has used, for subscription plan limits.
      *
      * Deleted clients and documents still count towards the month they were created in.
      *
-     * @return array{clients: int, estimates_this_month: int, invoices_this_month: int}
+     * @return array{clients: int, estimates_this_month: int, invoices_this_month: int, proformas_this_month: int}
      */
     public function usage(): array
     {
@@ -200,6 +209,7 @@ class Business extends Model
             'clients' => $this->clients()->count(),
             'estimates_this_month' => (int) ($documentsThisMonth[DocumentType::Estimate->value] ?? 0),
             'invoices_this_month' => (int) ($documentsThisMonth[DocumentType::Invoice->value] ?? 0),
+            'proformas_this_month' => (int) ($documentsThisMonth[DocumentType::ProForma->value] ?? 0),
         ];
     }
 
@@ -246,6 +256,7 @@ class Business extends Model
             'clients' => $usage['clients'],
             'invoices_per_month' => $usage['invoices_this_month'],
             'estimates_per_month' => $usage['estimates_this_month'],
+            'proformas_per_month' => $usage['proformas_this_month'],
             'team_members' => $this->users()->count() + $this->invitations()->count(),
             'assistant_messages_per_month' => AssistantMessage::query()
                 ->withoutGlobalScopes()
