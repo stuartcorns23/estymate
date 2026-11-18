@@ -160,7 +160,7 @@ class Document extends Model
 
         if ($this->total > 0 && $this->amount_paid >= $this->total) {
             $this->status = DocumentStatus::Paid;
-            $this->paid_at ??= $this->payments()->latest('paid_on')->value('paid_on') ?? now();
+            $this->paid_at ??= $this->payments()->max('paid_on') ?? now();
         } elseif ($this->status === DocumentStatus::Paid) {
             $this->status = DocumentStatus::Sent;
             $this->paid_at = null;

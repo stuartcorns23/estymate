@@ -29,6 +29,7 @@ interface PreviewInvoice {
     total: number | null;
     tax_total: number | null;
     amount_paid: number | null;
+    payments: number;
     lines: number;
 }
 
@@ -409,6 +410,9 @@ export default function InvoiceImport({ fields, maxBytes }: { fields: { value: s
                                                         <p className="text-muted-foreground text-xs">
                                                             {money(invoice.amount_paid, invoice.currency)} paid
                                                         </p>
+                                                    )}
+                                                    {invoice.payments > 1 && (
+                                                        <p className="text-muted-foreground text-xs">{invoice.payments} payments</p>
                                                     )}
                                                 </td>
                                             </tr>

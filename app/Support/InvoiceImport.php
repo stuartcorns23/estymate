@@ -30,18 +30,25 @@ class InvoiceImport
      * Fields a column can be mapped to, with their labels.
      */
     public const FIELDS = [
+        'document_type' => 'Document type',
         'number' => 'Invoice number',
         'client_name' => 'Client name',
         'client_email' => 'Client email',
         'client_address_line_1' => 'Client address',
+        'client_address_line_2' => 'Client address line 2',
         'client_city' => 'Client town or city',
         'client_postcode' => 'Client postcode',
+        'client_country' => 'Client country',
         'client_vat_number' => 'Client VAT number',
         'issue_date' => 'Issue date',
         'due_date' => 'Due date',
         'status' => 'Status (paid, unpaid…)',
-        'amount_paid' => 'Amount paid',
-        'paid_date' => 'Date paid',
+        'amount_paid' => 'Amount paid (or each payment)',
+        'paid_date' => 'Date paid (or each payment date)',
+        'payment_method' => 'Payment method',
+        'payment_reference' => 'Payment reference',
+        'payment_note' => 'Payment note',
+        'discount' => 'Discount (kept in the notes)',
         'currency' => 'Currency',
         'reference' => 'Reference',
         'notes' => 'Notes',
@@ -63,18 +70,25 @@ class InvoiceImport
      * Billdu's headings come first in each list.
      */
     private const ALIASES = [
-        'number' => ['number', 'invoicenumber', 'invoiceno', 'invoicenr', 'documentnumber', 'documentno', 'no', 'nr', 'invoice', 'invoiceid'],
+        'document_type' => ['documenttype', 'doctype', 'documentkind'],
+        'number' => ['invoicenumber', 'number', 'invoiceno', 'invoicenr', 'documentnumber', 'documentno', 'no', 'nr', 'invoice', 'invoiceid'],
         'client_name' => ['client', 'businessname', 'clientname', 'clientbusinessname', 'customer', 'customername', 'company', 'companyname', 'billto', 'buyer', 'partner', 'name', 'contact'],
         'client_email' => ['emails', 'email', 'clientemail', 'clientemails', 'customeremail', 'emailaddress'],
         'client_address_line_1' => ['street', 'clientstreet', 'address', 'clientaddress', 'billingaddress', 'billingstreet'],
+        'client_address_line_2' => ['apartmentsuite', 'address2', 'addressline2', 'street2', 'billingstreet2'],
         'client_city' => ['city', 'clientcity', 'town', 'billingcity'],
         'client_postcode' => ['zipcode', 'clientzipcode', 'zip', 'postcode', 'postalcode', 'billingpostcode'],
+        'client_country' => ['countrycode', 'country', 'clientcountry', 'billingcountry'],
         'client_vat_number' => ['vatregno', 'clientvatregno', 'vatnumber', 'clientvatnumber', 'customervatnumber', 'vatno'],
         'issue_date' => ['issuedate', 'dateofissue', 'date', 'invoicedate', 'dateissued', 'issued', 'documentdate', 'created', 'createdat'],
         'due_date' => ['duedate', 'dateofmaturity', 'maturity', 'maturitydate', 'due', 'paymentdue', 'paymentduedate', 'duedateofpayment'],
         'status' => ['status', 'state', 'paymentstatus', 'paidstatus', 'invoicestatus'],
-        'amount_paid' => ['paid', 'amountpaid', 'paidamount', 'totalpaid', 'payments', 'paymentsreceived'],
-        'paid_date' => ['paiddate', 'datepaid', 'dateofpayment', 'paymentdate', 'paidon', 'paidat'],
+        'amount_paid' => ['sumofpayment', 'sumofpayments', 'paymentamount', 'amountofpayment', 'paid', 'amountpaid', 'paidamount', 'totalpaid', 'payments', 'paymentsreceived'],
+        'paid_date' => ['paymentdate', 'paiddate', 'datepaid', 'dateofpayment', 'paidon', 'paidat'],
+        'payment_method' => ['paymentmethod', 'method', 'paymenttype', 'paidby', 'paidvia'],
+        'payment_reference' => ['paymentreference', 'paymentref'],
+        'payment_note' => ['paymentnote', 'paymentnotes', 'paymentcomment'],
+        'discount' => ['discount', 'discountpercent', 'discountrate', 'discountamount'],
         'currency' => ['currency', 'currencycode'],
         'reference' => ['reference', 'yourreference', 'ordernumber', 'orderno', 'ponumber', 'purchaseorder', 'variablesymbol'],
         'notes' => ['note', 'notes', 'comment', 'comments', 'footer', 'remarks'],
@@ -96,6 +110,13 @@ class InvoiceImport
      */
     private const STANDARD_RATES = [0, 5, 12.5, 15, 17.5, 20];
 
+    private const PAYMENT_METHODS = [
+        'bank_transfer' => ['transfer', 'bacs', 'bank', 'fps', 'fasterpayment', 'standingorder', 'directdebit'],
+        'card' => ['card', 'debit', 'credit', 'visa', 'mastercard', 'amex'],
+        'cash' => ['cash'],
+        'cheque' => ['cheque', 'check'],
+    ];
+
     private const CURRENCY_SYMBOLS = ['£' => 'GBP', '€' => 'EUR', '$' => 'USD'];
 
     /**
@@ -115,14 +136,14 @@ class InvoiceImport
     /**
      * The name of the app the CSV was exported from, when we recognise it.
      *
-     * Billdu names its columns the same way across its exports ("Business name",
-     * "E-mails", "VAT Reg. No.", "Date of maturity"), so any two of those next to an
-     * invoice number is taken as Billdu.
+     * Billdu's invoice export has headings like "Document type", "# VAT Reg. No.",
+     * "Apartment, suite", "Sum of payment" and "Created by", so any two of those next
+     * to an invoice number is taken as Billdu.
      */
     public function format(): ?string
     {
         $headers = array_map(ClientImport::normalise(...), $this->headers);
-        $billdu = array_intersect(['businessname', 'emails', 'vatregno', 'dateofmaturity', 'dateofissue', 'totalwithoutvat', 'variablesymbol'], $headers);
+        $billdu = array_intersect(['documenttype', 'vatregno', 'apartmentsuite', 'sumofpayment', 'paymentnote', 'createdby', 'deliverydate', 'businessname', 'emails', 'dateofmaturity'], $headers);
         $hasNumber = array_intersect(['number', 'invoicenumber', 'documentnumber'], $headers) !== [];
 
         return $hasNumber && count($billdu) >= 2 ? 'Billdu' : null;
@@ -190,10 +211,26 @@ class InvoiceImport
         $byEmail = $clients->filter(fn ($client) => $client->email)->keyBy(fn ($client) => Str::lower($client->email));
         $newClients = [];
         $results = [];
+        $numberCounts = [];
 
         foreach ($this->groups($columns) as $key => $group) {
             $invoice = $this->buildInvoice($group, $columns, $defaultCurrency, $paymentTermsDays);
             $invoice['key'] = $key;
+
+            // Invoice numbers must be unique here, so a number used again for another client gets "-2", "-3"...
+            if ($invoice['number'] !== '') {
+                $count = $numberCounts[Str::lower($invoice['number'])] = ($numberCounts[Str::lower($invoice['number'])] ?? 0) + 1;
+
+                if ($count > 1) {
+                    $original = $invoice['number'];
+                    $invoice['number'] = "{$original}-{$count}";
+
+                    if ($invoice['status'] !== 'invalid') {
+                        $invoice['status'] = 'warning';
+                        $invoice['messages'][] = "Invoice number {$original} is used for more than one client, so this one is imported as {$invoice['number']}.";
+                    }
+                }
+            }
 
             if ($invoice['status'] !== 'invalid') {
                 $client = $invoice['client'];
@@ -233,7 +270,12 @@ class InvoiceImport
     }
 
     /**
-     * Rows grouped by invoice number, in the order they first appear.
+     * Rows grouped into invoices, in the order they first appear.
+     *
+     * Rows with the same number and client are one invoice (one row per line item).
+     * The same number for a different client is a separate invoice: Billdu lets
+     * numbers repeat, such as "001" for each client. A line row that leaves the
+     * client blank belongs to the last invoice with its number.
      *
      * @param  array<string, int>  $columns
      * @return array<string, list<array{row: int, cells: list<string>}>>
@@ -241,11 +283,22 @@ class InvoiceImport
     private function groups(array $columns): array
     {
         $groups = [];
+        $lastForNumber = [];
 
         foreach ($this->rows as $index => $cells) {
             $row = $index + 2; // The row number in a spreadsheet, under the heading row.
-            $number = isset($columns['number']) ? self::clean($cells[$columns['number']] ?? '') : '';
-            $key = $number === '' ? "row-{$row}" : 'n-'.Str::lower($number);
+            $number = isset($columns['number']) ? Str::lower(self::clean($cells[$columns['number']] ?? '')) : '';
+            $client = isset($columns['client_name']) ? ClientImport::nameKey(self::clean($cells[$columns['client_name']] ?? '')) : '';
+
+            if ($number === '') {
+                $key = "row-{$row}";
+            } elseif ($client === '' && isset($lastForNumber[$number])) {
+                $key = $lastForNumber[$number];
+            } else {
+                $key = "n-{$number}-{$client}";
+                $lastForNumber[$number] = $key;
+            }
+
             $groups[$key][] = ['row' => $row, 'cells' => $cells];
         }
 
@@ -300,10 +353,10 @@ class InvoiceImport
             return $invalid('There is no client name.');
         }
 
-        $clientNames = collect($group)->map(fn ($line) => ClientImport::nameKey(self::clean($line['cells'][$columns['client_name']] ?? '')))->filter()->unique();
+        $type = ClientImport::normalise($first('document_type'));
 
-        if ($clientNames->count() > 1) {
-            return $invalid("Rows with invoice number {$invoice['number']} are for different clients. Each invoice needs its own number.");
+        if ($type !== '' && ! in_array($type, ['invoice', 'taxinvoice', 'salesinvoice', 'faktura'], true)) {
+            return $invalid('This is a '.Str::lower($first('document_type')).", not an invoice, so it isn't imported.");
         }
 
         $issueText = $first('issue_date');
@@ -343,15 +396,36 @@ class InvoiceImport
             $messages[] = 'The lines add up to '.Money::format($total).' but the file says '.Money::format($fileTotal).'. Check the invoice after importing.';
         }
 
-        [$status, $paid, $statusMessages] = $this->status($first('status'), $first('amount_paid'), $total);
-        $messages = [...$messages, ...$statusMessages];
-        $paidDate = $paid > 0 ? (self::date($first('paid_date')) ?? $issueDate) : null;
+        [$payments, $paymentMessages] = $this->payments($first, $total, $issueDate);
+        [$status, $paid, $statusMessages] = $this->status($first('status'), $payments === null ? $first('amount_paid') : '', $total, $payments);
+        $messages = [...$messages, ...$paymentMessages, ...$statusMessages];
+
+        if ($status === 'void' || ($status === 'draft' && $paid === 0)) {
+            $payments = [];
+        } elseif ($payments === null) {
+            // A paid status or "yes" with no amounts: one payment for what was paid.
+            $payments = $paid > 0 ? [[
+                'amount' => $paid,
+                'paid_on' => (self::date(explode(';', $first('paid_date'))[0]) ?? $issueDate)->toDateString(),
+                'method' => self::paymentMethod($first('payment_method')),
+                'reference' => self::paymentReference($first('payment_reference'), $first('payment_note')),
+            ]] : [];
+        }
+
+        $paidDate = $payments === [] ? null : end($payments)['paid_on'];
+
+        if (($discount = $first('discount')) !== '' && (self::number($discount) ?? 0) > 0) {
+            $notes = trim($first('notes')."\nDiscount in the old app: {$discount} (already taken off the total).");
+        }
+
         $currency = self::currency($first('currency')) ?? $defaultCurrency;
 
         $client = array_filter([
             'name' => Str::limit($clientName, 255, ''),
             'email' => self::email($first('client_email')),
             'address_line_1' => Str::limit($first('client_address_line_1'), 255, '') ?: null,
+            'address_line_2' => Str::limit($first('client_address_line_2'), 255, '') ?: null,
+            'country' => preg_match('/^[A-Za-z]{2}$/', $first('client_country')) ? Str::upper($first('client_country')) : null,
             'city' => Str::limit($first('client_city'), 255, '') ?: null,
             'postcode' => Str::upper(Str::limit($first('client_postcode'), 20, '')) ?: null,
             'vat_number' => Str::limit($first('client_vat_number'), 30, '') ?: null,
@@ -365,11 +439,12 @@ class InvoiceImport
             'issue_date' => $issueDate->toDateString(),
             'due_date' => $dueDate->toDateString(),
             'reference' => Str::limit($first('reference'), 255, '') ?: null,
-            'notes' => Str::limit($first('notes'), 5000, '') ?: null,
+            'notes' => Str::limit($notes ?? $first('notes'), 5000, '') ?: null,
             'currency' => $currency,
             'invoice_status' => $status,
-            'amount_paid' => $paid,
-            'paid_date' => $paidDate?->toDateString(),
+            'amount_paid' => array_sum(array_column($payments, 'amount')),
+            'paid_date' => $paidDate,
+            'payments' => $payments,
             'subtotal' => $subtotal,
             'tax_total' => $taxTotal,
             'total' => $total,
@@ -463,10 +538,6 @@ class InvoiceImport
         $vat = $invoiceVat ?? ($invoiceTotal !== null && $invoiceNet !== null ? max(0, $invoiceTotal - $invoiceNet) : 0);
         $rate = $net > 0 ? self::snapRate($vat / $net * 100) : 0.0;
 
-        if ($invoiceVat === null && $invoiceNet === null) {
-            $messages[] = 'The file only has a total, so the invoice is imported with no VAT.';
-        }
-
         return [[[
             'description' => "Invoice {$number}",
             'quantity' => 1.0,
@@ -483,7 +554,10 @@ class InvoiceImport
      *
      * @return array{0: string, 1: int, 2: list<string>}
      */
-    private function status(string $statusText, string $paidText, int $total): array
+    /**
+     * @param  list<array{amount: int}>|null  $payments  Payments read from the file, if it lists them.
+     */
+    private function status(string $statusText, string $paidText, int $total, ?array $payments = null): array
     {
         $key = ClientImport::normalise($statusText);
         $messages = [];
@@ -499,7 +573,7 @@ class InvoiceImport
         };
 
         $paidKey = ClientImport::normalise($paidText);
-        $paid = match (true) {
+        $paid = $payments !== null ? array_sum(array_column($payments, 'amount')) : match (true) {
             in_array($paidKey, ['yes', 'y', 'true', 'paid'], true) => $total,
             in_array($paidKey, ['no', 'n', 'false', 'unpaid'], true) => 0,
             default => self::money($paidText),
@@ -526,6 +600,89 @@ class InvoiceImport
         }
 
         return [$paid >= $total && $total > 0 ? 'paid' : 'sent', max(0, $paid), $messages];
+    }
+
+    /**
+     * The payments the file lists for an invoice, or null when it only says "paid" or
+     * "yes". Billdu puts several payments in one cell, separated by semicolons, with
+     * the dates, methods, references and notes in matching order.
+     *
+     * Payments that add up to more than the total are cut back to the total, since
+     * an overpayment can't be recorded (Billdu sometimes lists a payment twice).
+     *
+     * @return array{0: list<array{amount: int, paid_on: string, method: string, reference: ?string}>|null, 1: list<string>}
+     */
+    private function payments(callable $first, int $total, CarbonImmutable $issueDate): array
+    {
+        $amountText = $first('amount_paid');
+        $amounts = explode(';', $amountText);
+
+        if ($amountText === '' || (count($amounts) === 1 && self::money($amountText) === null)) {
+            return [null, []];
+        }
+
+        $dates = explode(';', $first('paid_date'));
+        $methods = explode(';', $first('payment_method'));
+        $references = explode(';', $first('payment_reference'));
+        $notes = explode(';', $first('payment_note'));
+        $payments = [];
+        $messages = [];
+        $left = $total;
+
+        foreach ($amounts as $index => $text) {
+            $amount = self::money($text);
+
+            if ($amount === null || $amount <= 0) {
+                continue;
+            }
+
+            if ($amount > $left) {
+                $messages[] = 'The payments add up to more than the total, so only '.Money::format($total).' is recorded as paid.';
+                $amount = $left;
+            }
+
+            if ($amount <= 0) {
+                break;
+            }
+
+            $dateText = trim($dates[$index] ?? '');
+            $date = self::date($dateText);
+
+            if ($date === null && $dateText !== '') {
+                $messages[] = "\"{$dateText}\" isn't a date we can read, so that payment is dated the issue date.";
+            }
+
+            $payments[] = [
+                'amount' => $amount,
+                'paid_on' => ($date ?? $issueDate)->toDateString(),
+                // A single method applies to every payment.
+                'method' => self::paymentMethod($methods[$index] ?? $methods[0]),
+                'reference' => self::paymentReference($references[$index] ?? '', $notes[$index] ?? ''),
+            ];
+            $left -= $amount;
+        }
+
+        return [$payments, array_values(array_unique($messages))];
+    }
+
+    private static function paymentMethod(string $value): string
+    {
+        $key = ClientImport::normalise($value);
+
+        foreach (self::PAYMENT_METHODS as $method => $words) {
+            if ($key !== '' && Str::contains($key, $words)) {
+                return $method;
+            }
+        }
+
+        return 'other';
+    }
+
+    private static function paymentReference(string $reference, string $note): ?string
+    {
+        $text = implode(' · ', array_filter([self::clean($reference), self::clean($note)], fn ($part) => $part !== ''));
+
+        return $text === '' ? null : Str::limit($text, 255, '');
     }
 
     /**
