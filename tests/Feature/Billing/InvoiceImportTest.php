@@ -5,6 +5,7 @@ namespace Tests\Feature\Billing;
 use App\Console\Commands\SendInvoiceReminders;
 use App\Enums\DocumentStatus;
 use App\Enums\DocumentType;
+use App\Enums\PaymentMethod;
 use App\Models\Client;
 use App\Models\Document;
 use App\Models\User;
@@ -33,6 +34,22 @@ class InvoiceImportTest extends TestCase
     }
 
     /**
+     * Rows in the layout of a real Billdu invoice export (names changed): several
+     * payments in one cell, a number reused for another client, and an overpayment.
+     */
+    private function billduExportCsv(): string
+    {
+        return "\xEF\xBB\xBF".implode("\r\n", [
+            '"Document type","Invoice number","Reference","Order number","Client","# VAT Reg. No.","Street","Apartment, suite","City","Zip Code","Country code","Country","Issue date","Due date","Delivery date","Discount","Total","Currency","Payment date","Sum of payment","Payment method","Payment reference","Payment note","Created by"',
+            '"Invoice","001","GLS-071","001","Glass Co Limited","","Unit 2 Kelvin Way","West Bromwich","Birmingham","B70 7TN","GB","United Kingdom","08/11/2018","22/11/2018","","0.00","500.00","GBP","04.12.2018;08.12.2018","100,00;500,00","Transfer",";","Deposit;","Someone"',
+            '"Invoice","001","PTA-0076","001","Party Hire","","146 Cannock Road","","Wolverhampton","WV10 8PX","GB","United Kingdom","08/02/2019","22/02/2019","08/02/2019","0.00","200.00","GBP","14.03.2019;19.06.2019","100,00;100,00","Transfer","001;001",";Paid by card","Someone"',
+            '"Invoice","INV-081","","","Party Hire","","146 Cannock Road","","Wolverhampton","WV10 8PX","GB","United Kingdom","01/03/2020","15/03/2020","","15.00","34.99","GBP","2020-03-02","34,99","Transfer","","BACS","Someone"',
+            '"Invoice","INV-338","","","Cranes Ltd","","","","","","GB","United Kingdom","01/11/2026","15/11/2026","","0.00","69.99","GBP","","","Transfer","","","Someone"',
+            '"Proforma invoice","PRO-1","","","Cranes Ltd","","","","","","GB","United Kingdom","01/11/2026","15/11/2026","","0.00","69.99","GBP","","","Transfer","","","Someone"',
+        ]);
+    }
+
+    /**
      * A generic export with one row per line item.
      */
     private function linesCsv(): string
@@ -52,6 +69,17 @@ class InvoiceImportTest extends TestCase
         $this->actingAs($user);
 
         return $user;
+    }
+
+    /**
+     * The preview's keys for the invoices with these numbers.
+     *
+     * @param  list<string>  $numbers
+     * @return list<string>
+     */
+    private function keys(string $csv, array $numbers): array
+    {
+        return collect($this->preview($csv)['invoices'])->whereIn('number', $numbers)->pluck('key')->values()->all();
     }
 
     private function preview(string $csv): array
@@ -119,7 +147,7 @@ class InvoiceImportTest extends TestCase
     public function test_invoices_already_added_are_flagged()
     {
         $this->user();
-        $this->post('/invoices/import', ['csv' => $this->billduCsv(), 'mapping' => $this->preview($this->billduCsv())['mapping'], 'invoices' => ['n-inv-0007']]);
+        $this->post('/invoices/import', ['csv' => $this->billduCsv(), 'mapping' => $this->preview($this->billduCsv())['mapping'], 'invoices' => $this->keys($this->billduCsv(), ['INV-0007'])]);
 
         $invoices = collect($this->preview($this->billduCsv())['invoices'])->keyBy('number');
 
@@ -135,7 +163,7 @@ class InvoiceImportTest extends TestCase
         $this->post('/invoices/import', [
             'csv' => $this->billduCsv(),
             'mapping' => $mapping,
-            'invoices' => ['n-inv-0007', 'n-inv-0008', 'n-inv-0009', 'n-inv-0010', 'n-inv-0012'],
+            'invoices' => $this->keys($this->billduCsv(), ['INV-0007', 'INV-0008', 'INV-0009', 'INV-0010', 'INV-0012']),
         ])->assertRedirect('/invoices')->assertSessionHas('status', 'Imported 4 invoices and added 2 new clients.');
 
         $paid = Document::where('number', 'INV-0007')->firstOrFail();
@@ -160,6 +188,57 @@ class InvoiceImportTest extends TestCase
         $this->assertSame(11, $user->currentBusiness->fresh()->next_invoice_number);
     }
 
+    public function test_real_billdu_exports_import_every_payment()
+    {
+        $user = $this->user();
+        $preview = $this->preview($this->billduExportCsv());
+
+        $this->assertSame('Billdu', $preview['format']);
+        $this->assertSame([
+            'document_type', 'number', 'reference', null, 'client_name', 'client_vat_number', 'client_address_line_1',
+            'client_address_line_2', 'client_city', 'client_postcode', 'client_country', null, 'issue_date', 'due_date',
+            null, 'discount', 'total', 'currency', 'paid_date', 'amount_paid', 'payment_method', 'payment_reference',
+            'payment_note', null,
+        ], $preview['mapping']);
+
+        $invoices = collect($preview['invoices'])->keyBy('number');
+        $this->assertSame(['001', '001-2', 'INV-081', 'INV-338', 'PRO-1'], $invoices->keys()->all());
+        $this->assertSame('invalid', $invoices['PRO-1']['status']);
+        $this->assertStringContainsString('001-2', $invoices['001-2']['messages'][0]);
+
+        $this->post('/invoices/import', [
+            'csv' => $this->billduExportCsv(),
+            'mapping' => $preview['mapping'],
+            'invoices' => $invoices->pluck('key')->all(),
+        ])->assertRedirect('/invoices')->assertSessionHas('status', 'Imported 4 invoices and added 3 new clients.');
+
+        // Two payments, the second cut back so the total paid isn't more than the invoice.
+        $glass = Document::where('number', '001')->with('payments')->firstOrFail();
+        $this->assertSame(DocumentStatus::Paid, $glass->status);
+        $this->assertSame([10000, 40000], $glass->payments->pluck('amount')->all());
+        $this->assertSame(['2018-12-04', '2018-12-08'], $glass->payments->map(fn ($p) => $p->paid_on->toDateString())->all());
+        $this->assertSame(PaymentMethod::BankTransfer, $glass->payments[0]->method);
+        $this->assertSame('Deposit', $glass->payments[0]->reference);
+        $this->assertSame('2018-12-08', $glass->paid_at->toDateString());
+
+        $party = Document::where('number', '001-2')->with('payments', 'client')->firstOrFail();
+        $this->assertSame('Party Hire', $party->client->name);
+        $this->assertSame('West Bromwich', $glass->client->address_line_2);
+        $this->assertSame([10000, 10000], $party->payments->pluck('amount')->all());
+        $this->assertSame('001 · Paid by card', $party->payments[1]->reference);
+
+        $discounted = Document::where('number', 'INV-081')->firstOrFail();
+        $this->assertSame($party->client_id, $discounted->client_id);
+        $this->assertStringContainsString('Discount in the old app: 15.00', $discounted->notes);
+        $this->assertSame(DocumentStatus::Paid, $discounted->status);
+
+        $unpaid = Document::where('number', 'INV-338')->firstOrFail();
+        $this->assertSame(DocumentStatus::Sent, $unpaid->status);
+        $this->assertSame(0, $unpaid->amount_paid);
+
+        $this->assertSame(339, $user->currentBusiness->fresh()->next_invoice_number);
+    }
+
     public function test_line_items_are_grouped_into_invoices()
     {
         $this->user();
@@ -172,7 +251,7 @@ class InvoiceImportTest extends TestCase
         $this->post('/invoices/import', [
             'csv' => $this->linesCsv(),
             'mapping' => $preview['mapping'],
-            'invoices' => ['n-1001', 'n-1002'],
+            'invoices' => $this->keys($this->linesCsv(), ['1001', '1002']),
         ])->assertRedirect('/invoices');
 
         $first = Document::where('number', '1001')->with('items')->firstOrFail();
@@ -200,7 +279,7 @@ class InvoiceImportTest extends TestCase
         $this->post('/invoices/import', [
             'csv' => $this->billduCsv(),
             'mapping' => $preview['mapping'],
-            'invoices' => ['n-inv-0007', 'n-inv-0008', 'n-inv-0009', 'n-inv-0010'],
+            'invoices' => $this->keys($this->billduCsv(), ['INV-0007', 'INV-0008', 'INV-0009', 'INV-0010']),
         ])->assertRedirect('/invoices');
 
         // Acme is already a client, Bright Signs takes the one client left, and Corner Shop would go over.
@@ -211,7 +290,7 @@ class InvoiceImportTest extends TestCase
     public function test_other_businesses_invoice_numbers_do_not_clash()
     {
         $this->user();
-        $this->post('/invoices/import', ['csv' => $this->billduCsv(), 'mapping' => $this->preview($this->billduCsv())['mapping'], 'invoices' => ['n-inv-0007']]);
+        $this->post('/invoices/import', ['csv' => $this->billduCsv(), 'mapping' => $this->preview($this->billduCsv())['mapping'], 'invoices' => $this->keys($this->billduCsv(), ['INV-0007'])]);
 
         $this->user();
         $invoices = collect($this->preview($this->billduCsv())['invoices'])->keyBy('number');

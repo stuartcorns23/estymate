@@ -112,7 +112,7 @@ class InvoiceImportController extends Controller
                         continue;
                     }
 
-                    $clientId = Client::create([...$invoice['client'], 'country' => 'GB'])->id;
+                    $clientId = Client::create(['country' => 'GB', ...$invoice['client']])->id;
                     $createdClients[$invoice['new_client']] = $clientId;
                     $clientsLeft = $clientsLeft === null ? null : $clientsLeft - 1;
                     $result['clients']++;
@@ -166,13 +166,16 @@ class InvoiceImportController extends Controller
             $document->items()->create([...$item, 'position' => $position]);
         }
 
-        if ($invoice['amount_paid'] > 0) {
+        foreach ($invoice['payments'] as $payment) {
             $document->payments()->save(new Payment([
-                'amount' => $invoice['amount_paid'],
-                'paid_on' => $invoice['paid_date'],
-                'method' => PaymentMethod::Other,
-                'reference' => 'Imported',
+                'amount' => $payment['amount'],
+                'paid_on' => $payment['paid_on'],
+                'method' => PaymentMethod::from($payment['method']),
+                'reference' => $payment['reference'] ?? 'Imported',
             ]));
+        }
+
+        if ($invoice['payments'] !== []) {
             $document->refreshPayments();
         }
     }
@@ -231,6 +234,7 @@ class InvoiceImportController extends Controller
             'total' => $invoice['total'] ?? null,
             'tax_total' => $invoice['tax_total'] ?? null,
             'amount_paid' => $invoice['amount_paid'] ?? null,
+            'payments' => count($invoice['payments'] ?? []),
             'lines' => count($invoice['items'] ?? []),
         ];
     }
