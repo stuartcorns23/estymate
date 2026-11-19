@@ -184,7 +184,7 @@ export default function InvoiceDesign({
             <Head title="Invoice design" />
 
             <SettingsLayout wide>
-                <div className="grid gap-10 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-10 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
                     <form onSubmit={submit} className="space-y-8">
                         <HeadingSmall title="Invoice design" description="How your estimates and invoices look, as PDFs and when printed" />
 
@@ -349,6 +349,7 @@ export default function InvoiceDesign({
                                 type="single"
                                 variant="outline"
                                 size="sm"
+                                className="flex-wrap justify-start"
                                 value={previewType}
                                 onValueChange={(value) => value && setPreviewType(value)}
                             >
