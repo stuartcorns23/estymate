@@ -14,6 +14,7 @@
     body { margin: 0; font-family: {!! $design->font->css() !!}; font-size: 10px; color: #1f2937; line-height: 1.45; background: #ffffff; }
     @if ($preview)
         html { background: #ffffff; }
+        body { position: relative; }
         .sheet { position: relative; width: 794px; min-height: 1123px; padding: {{ $marginY }}px {{ $marginX }}px {{ $marginY + $footerReserve }}px; margin: 0 auto; }
     @endif
     table { border-collapse: collapse; }

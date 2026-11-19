@@ -19,6 +19,7 @@
     </style>
 </head>
 <body>
+@include('pdf.partials.footer')
 <div class="sheet">
     <div class="band">
         <table class="w-full">
@@ -53,7 +54,7 @@
     @include('pdf.partials.items')
     @include('pdf.partials.totals')
     @include('pdf.partials.notes')
-    @include('pdf.partials.footer')
+    @include('pdf.partials.signature')
 </div>
 </body>
 </html>
