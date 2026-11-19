@@ -4,11 +4,13 @@ namespace Tests\Feature\Settings;
 
 use App\Enums\BusinessRole;
 use App\Enums\DocumentLayout;
+use App\Enums\DocumentType;
 use App\Models\Client;
 use App\Models\Document;
 use App\Models\User;
 use App\Support\DocumentDesign;
 use App\Support\DocumentPdf;
+use App\Support\SampleDocument;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -168,6 +170,111 @@ class DocumentDesignTest extends TestCase
             $this->assertStringContainsString('data:image/png;base64,', DocumentPdf::html($invoice));
             $this->assertStringStartsWith('%PDF', DocumentPdf::render($invoice), $layout->value);
         }
+    }
+
+    public function test_the_footer_shows_contact_and_bank_details()
+    {
+        $user = User::factory()->withBusiness()->create();
+        $this->actingAs($user);
+
+        $this->patch('/settings/business', [
+            'name' => 'Tandonta Web Development',
+            'email' => 'info@example.com',
+            'phone' => '01902 000000',
+            'website' => 'www.example.com',
+            'contact_name' => 'Stuart Corns',
+            'address_line_1' => '1 Hatton House',
+            'city' => 'Wolverhampton',
+            'postcode' => 'WV10 0SZ',
+            'company_number' => '01234567',
+            'bank_name' => 'Starling',
+            'bank_account_name' => 'Tandonta Web Design',
+            'bank_sort_code' => '608371',
+            'bank_account_number' => '12345678',
+            'bank_iban' => 'gb03 srlg 6083 7112 3456 78',
+            'bank_bic' => 'srlggb2l',
+        ])->assertSessionHasNoErrors();
+
+        $business = $user->currentBusiness->fresh();
+        $this->assertSame('60-83-71', $business->bank_sort_code);
+        $this->assertSame('GB03SRLG60837112345678', $business->bank_iban);
+        $this->assertSame('SRLGGB2L', $business->bank_bic);
+
+        $this->post('/settings/invoice-design/preview', $this->payload())
+            ->assertOk()
+            ->assertSee('<strong>Tandonta Web Development</strong>, 1 Hatton House, Wolverhampton, WV10 0SZ', false)
+            ->assertSee('Contact person: <strong>Stuart Corns</strong>', false)
+            ->assertSee('Web: <strong>www.example.com</strong>', false)
+            ->assertSee('Sort code: <strong>60-83-71</strong>', false)
+            ->assertSee('BIC/SWIFT: <strong>SRLGGB2L</strong>', false)
+            ->assertSee('Company number: <strong>01234567</strong>', false);
+
+        // Turning the details off keeps only the name and the legal details.
+        $this->post('/settings/invoice-design/preview', $this->payload(['document_footer_details' => false]))
+            ->assertOk()
+            ->assertDontSee('Sort code:', false)
+            ->assertSee('Company number: <strong>01234567</strong>', false);
+    }
+
+    public function test_bank_details_are_validated()
+    {
+        $user = User::factory()->withBusiness()->create();
+
+        $this->actingAs($user)
+            ->patch('/settings/business', ['name' => 'Acme', 'bank_sort_code' => '12-34', 'bank_bic' => 'nope'])
+            ->assertSessionHasErrors(['bank_sort_code', 'bank_bic']);
+    }
+
+    public function test_a_signature_can_be_added_to_documents()
+    {
+        Storage::fake(DocumentDesign::DISK);
+        $user = User::factory()->withBusiness()->create();
+        $this->actingAs($user);
+
+        $this->post('/settings/invoice-design', $this->payload([
+            'signature' => UploadedFile::fake()->image('signature.png', 400, 140),
+            'document_show_signature' => true,
+            'document_signature_name' => 'Stuart Corns',
+        ]))->assertSessionHasNoErrors();
+
+        $business = $user->currentBusiness->fresh();
+        $this->assertTrue($business->document_show_signature);
+        Storage::disk(DocumentDesign::DISK)->assertExists($business->document_signature_path);
+        $this->get('/settings/invoice-design/signature')->assertOk();
+
+        $invoice = SampleDocument::make($business, DocumentType::Invoice);
+        $html = DocumentPdf::html($invoice);
+        $this->assertStringContainsString('Issued by, signature', $html);
+        $this->assertStringContainsString('alt="Signature"', $html);
+        $this->assertStringContainsString('Stuart Corns', $html);
+        $this->assertStringStartsWith('%PDF', DocumentPdf::render($invoice));
+
+        // Switched off, the signature stays saved but isn't printed.
+        $this->post('/settings/invoice-design', $this->payload(['document_show_signature' => false]));
+        $invoice = SampleDocument::make($business->fresh(), DocumentType::Invoice);
+        $this->assertStringNotContainsString('alt="Signature"', DocumentPdf::html($invoice));
+
+        // Removing it deletes the file and can't leave the toggle on.
+        $path = $business->document_signature_path;
+        $this->post('/settings/invoice-design', $this->payload(['remove_signature' => true, 'document_show_signature' => true]));
+        $business->refresh();
+        $this->assertNull($business->document_signature_path);
+        $this->assertFalse($business->document_show_signature);
+        Storage::disk(DocumentDesign::DISK)->assertMissing($path);
+    }
+
+    public function test_the_preview_shows_a_newly_drawn_signature()
+    {
+        $user = User::factory()->withBusiness()->create();
+
+        $this->actingAs($user)
+            ->post('/settings/invoice-design/preview', $this->payload([
+                'signature' => UploadedFile::fake()->image('signature.png', 600, 200),
+                'document_show_signature' => true,
+            ]))
+            ->assertOk()
+            ->assertSee('alt="Signature" ', false)
+            ->assertSee('width="200" height="67"', false);
     }
 
     public function test_text_on_colours_stays_readable()

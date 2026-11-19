@@ -26,6 +26,12 @@ class DocumentDesignRequest extends FormRequest
             // PNG and JPEG only: they're what the PDF renderer embeds reliably.
             'logo' => ['nullable', 'file', 'mimes:png,jpg,jpeg', 'max:1024'],
             'remove_logo' => ['sometimes', 'boolean'],
+            'document_footer_details' => ['sometimes', 'boolean'],
+            // Uploaded or drawn on the page; drawn signatures arrive as PNGs.
+            'signature' => ['nullable', 'file', 'mimes:png,jpg,jpeg', 'max:1024'],
+            'remove_signature' => ['sometimes', 'boolean'],
+            'document_show_signature' => ['sometimes', 'boolean'],
+            'document_signature_name' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -39,6 +45,8 @@ class DocumentDesignRequest extends FormRequest
             'document_accent_colour.regex' => 'Choose a colour like #2563EB.',
             'logo.mimes' => 'Upload your logo as a PNG or JPG.',
             'logo.max' => 'Your logo must be 1 MB or smaller.',
+            'signature.mimes' => 'Upload your signature as a PNG or JPG.',
+            'signature.max' => 'Your signature must be 1 MB or smaller.',
         ];
     }
 }

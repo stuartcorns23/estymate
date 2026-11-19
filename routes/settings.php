@@ -33,6 +33,7 @@ Route::middleware(['auth', 'business'])->group(function () {
     Route::post('settings/invoice-design', [DocumentDesignController::class, 'update'])->name('invoice-design.update');
     Route::post('settings/invoice-design/preview', [DocumentDesignController::class, 'preview'])->name('invoice-design.preview');
     Route::get('settings/invoice-design/logo', [DocumentDesignController::class, 'logo'])->name('invoice-design.logo');
+    Route::get('settings/invoice-design/signature', [DocumentDesignController::class, 'signature'])->name('invoice-design.signature');
 
     Route::get('settings/billing', [BillingController::class, 'edit'])->name('billing.edit');
     Route::post('settings/billing/checkout/{plan}', [BillingController::class, 'checkout'])->name('billing.checkout');

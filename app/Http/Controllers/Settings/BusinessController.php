@@ -35,7 +35,20 @@ class BusinessController extends Controller
 
         Gate::authorize('update', $business);
 
-        $business->update($request->validated());
+        $validated = $request->validated();
+
+        // Store bank details in the form they're printed: 60-83-71, GB03SRLG..., SRLGGB2L.
+        if (! empty($validated['bank_sort_code'])) {
+            $digits = preg_replace('/\D/', '', $validated['bank_sort_code']);
+            $validated['bank_sort_code'] = implode('-', str_split($digits, 2));
+        }
+        foreach (['bank_iban', 'bank_bic'] as $field) {
+            if (! empty($validated[$field])) {
+                $validated[$field] = strtoupper(preg_replace('/\s+/', '', $validated[$field]));
+            }
+        }
+
+        $business->update($validated);
 
         return to_route('business.edit');
     }

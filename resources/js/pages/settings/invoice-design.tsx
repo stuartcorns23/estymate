@@ -1,12 +1,13 @@
 import { type BreadcrumbItem } from '@/types';
 import { Transition } from '@headlessui/react';
-import { Head, useForm } from '@inertiajs/react';
-import { FileText, ImageUp, LoaderCircle, Trash2 } from 'lucide-react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { Eraser, FileText, ImageUp, LoaderCircle, PenLine, Trash2 } from 'lucide-react';
 import { FormEventHandler, useEffect, useMemo, useRef, useState } from 'react';
 
 import HeadingSmall from '@/components/heading-small';
 import InputError from '@/components/input-error';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -35,6 +36,9 @@ type Design = {
     document_accent_colour: string;
     document_font: string;
     document_footer: string;
+    document_footer_details: boolean;
+    document_show_signature: boolean;
+    document_signature_name: string;
 };
 
 interface Option {
@@ -46,6 +50,8 @@ interface Option {
 type DesignForm = Design & {
     logo: File | null;
     remove_logo: boolean;
+    signature: File | null;
+    remove_signature: boolean;
 };
 
 function xsrfToken(): string {
@@ -62,6 +68,13 @@ function previewBody(data: DesignForm, type: string, format: 'html' | 'pdf'): Fo
     body.append('document_font', data.document_font);
     body.append('document_footer', data.document_footer);
     body.append('remove_logo', data.remove_logo ? '1' : '0');
+    body.append('document_footer_details', data.document_footer_details ? '1' : '0');
+    body.append('document_show_signature', data.document_show_signature ? '1' : '0');
+    body.append('document_signature_name', data.document_signature_name);
+    body.append('remove_signature', data.remove_signature ? '1' : '0');
+    if (data.signature) {
+        body.append('signature', data.signature);
+    }
     body.append('type', type);
     body.append('format', format);
     if (data.logo) {
@@ -78,12 +91,14 @@ function isHex(value: string): boolean {
 export default function InvoiceDesign({
     design,
     logoUrl,
+    signatureUrl,
     layouts,
     fonts,
     canUpdate,
 }: {
     design: Design;
     logoUrl: string | null;
+    signatureUrl: string | null;
     layouts: Option[];
     fonts: Option[];
     canUpdate: boolean;
@@ -92,7 +107,10 @@ export default function InvoiceDesign({
         ...design,
         logo: null,
         remove_logo: false,
+        signature: null,
+        remove_signature: false,
     });
+    const [drawing, setDrawing] = useState(false);
 
     const [previewType, setPreviewType] = useState('invoice');
     const [previewHtml, setPreviewHtml] = useState<string | null>(null);
@@ -140,6 +158,11 @@ export default function InvoiceDesign({
         data.document_footer,
         data.logo,
         data.remove_logo,
+        data.document_footer_details,
+        data.document_show_signature,
+        data.document_signature_name,
+        data.signature,
+        data.remove_signature,
         previewType,
     ]);
 
@@ -171,13 +194,17 @@ export default function InvoiceDesign({
         post(route('invoice-design.update'), {
             forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => setData((current) => ({ ...current, logo: null, remove_logo: false })),
+            onSuccess: () => setData((current) => ({ ...current, logo: null, remove_logo: false, signature: null, remove_signature: false })),
         });
     };
 
     const selectedLogoUrl = useMemo(() => (data.logo ? URL.createObjectURL(data.logo) : null), [data.logo]);
     useEffect(() => () => (selectedLogoUrl ? URL.revokeObjectURL(selectedLogoUrl) : undefined), [selectedLogoUrl]);
     const shownLogo = selectedLogoUrl ?? (data.remove_logo ? null : logoUrl);
+
+    const selectedSignatureUrl = useMemo(() => (data.signature ? URL.createObjectURL(data.signature) : null), [data.signature]);
+    useEffect(() => () => (selectedSignatureUrl ? URL.revokeObjectURL(selectedSignatureUrl) : undefined), [selectedSignatureUrl]);
+    const shownSignature = selectedSignatureUrl ?? (data.remove_signature ? null : signatureUrl);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -318,10 +345,140 @@ export default function InvoiceDesign({
                                 disabled={disabled}
                                 placeholder="Thank you for your business!"
                             />
-                            <p className="text-muted-foreground text-xs">
-                                Shown at the bottom of every estimate and invoice, above your company and VAT numbers.
-                            </p>
+                            <p className="text-muted-foreground text-xs">Shown at the bottom of every page, above your business details.</p>
                             <InputError message={errors.document_footer} />
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <Checkbox
+                                id="document_footer_details"
+                                checked={data.document_footer_details}
+                                onCheckedChange={(checked) => setData('document_footer_details', checked === true)}
+                                disabled={disabled}
+                            />
+                            <div className="grid gap-1">
+                                <Label htmlFor="document_footer_details">Show business details in the footer</Label>
+                                <p className="text-muted-foreground text-xs">
+                                    Your address, contact person, phone, website, email and bank details, from{' '}
+                                    <Link href={route('business.edit')} className="underline underline-offset-2">
+                                        Business settings
+                                    </Link>
+                                    . Empty details are left out.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label>Signature</Label>
+                            {drawing ? (
+                                <SignaturePad
+                                    onCancel={() => setDrawing(false)}
+                                    onSave={(file) => {
+                                        setData((current) => ({
+                                            ...current,
+                                            signature: file,
+                                            remove_signature: false,
+                                            document_show_signature: true,
+                                        }));
+                                        setDrawing(false);
+                                    }}
+                                />
+                            ) : (
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-muted/40 flex h-16 w-36 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-white">
+                                        {shownSignature ? (
+                                            <img src={shownSignature} alt="Your signature" className="max-h-14 max-w-32 object-contain" />
+                                        ) : (
+                                            <span className="text-muted-foreground text-xs">No signature</span>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => setDrawing(true)}>
+                                            <PenLine className="size-4" />
+                                            Draw
+                                        </Button>
+                                        <label
+                                            htmlFor="signature"
+                                            className={cn(
+                                                buttonVariants({ variant: 'outline', size: 'sm' }),
+                                                'cursor-pointer',
+                                                disabled && 'pointer-events-none opacity-50',
+                                            )}
+                                        >
+                                            <ImageUp className="size-4" />
+                                            Upload
+                                        </label>
+                                        {shownSignature && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                disabled={disabled}
+                                                onClick={() =>
+                                                    setData((current) => ({
+                                                        ...current,
+                                                        signature: null,
+                                                        remove_signature: true,
+                                                        document_show_signature: false,
+                                                    }))
+                                                }
+                                            >
+                                                <Trash2 className="size-4" />
+                                                Remove
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <input
+                                        id="signature"
+                                        type="file"
+                                        accept="image/png,image/jpeg"
+                                        className="sr-only"
+                                        disabled={disabled}
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0] ?? null;
+                                            setData((current) => ({
+                                                ...current,
+                                                signature: file,
+                                                remove_signature: false,
+                                                document_show_signature: file ? true : current.document_show_signature,
+                                            }));
+                                            e.target.value = '';
+                                        }}
+                                    />
+                                </div>
+                            )}
+                            <p className="text-muted-foreground text-xs">
+                                Draw it here, or upload a PNG or JPG of your signature on a white or transparent background.
+                            </p>
+                            <InputError message={errors.signature} />
+
+                            <div className="flex items-start gap-3">
+                                <Checkbox
+                                    id="document_show_signature"
+                                    checked={data.document_show_signature && !!shownSignature}
+                                    onCheckedChange={(checked) => setData('document_show_signature', checked === true)}
+                                    disabled={disabled || !shownSignature}
+                                />
+                                <div className="grid gap-1">
+                                    <Label htmlFor="document_show_signature">Sign my documents</Label>
+                                    <p className="text-muted-foreground text-xs">
+                                        Adds &ldquo;Issued by, signature&rdquo; with your signature above the footer.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="document_signature_name">Name under the signature</Label>
+                                <Input
+                                    id="document_signature_name"
+                                    value={data.document_signature_name}
+                                    maxLength={255}
+                                    onChange={(e) => setData('document_signature_name', e.target.value)}
+                                    disabled={disabled}
+                                    placeholder="Optional"
+                                />
+                                <InputError message={errors.document_signature_name} />
+                            </div>
                         </div>
 
                         {canUpdate ? (
@@ -442,6 +599,140 @@ function ColourField({
             </div>
             <p className="text-muted-foreground text-xs">{hint}</p>
             <InputError message={error} />
+        </div>
+    );
+}
+
+/**
+ * A box to sign in with a mouse, finger or stylus. Saves the signature as a PNG cropped to the ink.
+ */
+function SignaturePad({ onSave, onCancel }: { onSave: (file: File) => void; onCancel: () => void }) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const last = useRef<{ x: number; y: number } | null>(null);
+    const [empty, setEmpty] = useState(true);
+
+    // Draw at the screen's pixel density so the line stays crisp.
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) {
+            return;
+        }
+        const ratio = window.devicePixelRatio || 1;
+        canvas.width = canvas.offsetWidth * ratio;
+        canvas.height = canvas.offsetHeight * ratio;
+        const context = canvas.getContext('2d');
+        if (context) {
+            context.scale(ratio, ratio);
+            context.lineCap = 'round';
+            context.lineJoin = 'round';
+            context.lineWidth = 2.2;
+            context.strokeStyle = '#1e3a8a';
+        }
+    }, []);
+
+    const point = (e: React.PointerEvent<HTMLCanvasElement>) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    };
+
+    const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        last.current = point(e);
+        const context = e.currentTarget.getContext('2d');
+        if (context) {
+            // A dot, so a single tap still marks the page.
+            context.beginPath();
+            context.arc(last.current.x, last.current.y, context.lineWidth / 2, 0, Math.PI * 2);
+            context.fillStyle = context.strokeStyle;
+            context.fill();
+        }
+        setEmpty(false);
+    };
+
+    const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
+        const context = e.currentTarget.getContext('2d');
+        if (!last.current || !context) {
+            return;
+        }
+        const next = point(e);
+        context.beginPath();
+        context.moveTo(last.current.x, last.current.y);
+        context.lineTo(next.x, next.y);
+        context.stroke();
+        last.current = next;
+    };
+
+    const end = () => {
+        last.current = null;
+    };
+
+    const clear = () => {
+        const canvas = canvasRef.current;
+        canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+        setEmpty(true);
+    };
+
+    const save = () => {
+        const canvas = canvasRef.current;
+        const context = canvas?.getContext('2d');
+        if (!canvas || !context) {
+            return;
+        }
+
+        // Crop to the ink, with a little margin, so the signature sits neatly on the page.
+        const { width, height } = canvas;
+        const pixels = context.getImageData(0, 0, width, height).data;
+        let [left, top, right, bottom] = [width, height, -1, -1];
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                if (pixels[(y * width + x) * 4 + 3] > 0) {
+                    left = Math.min(left, x);
+                    right = Math.max(right, x);
+                    top = Math.min(top, y);
+                    bottom = Math.max(bottom, y);
+                }
+            }
+        }
+        if (right < 0) {
+            return;
+        }
+        const pad = 8;
+        left = Math.max(0, left - pad);
+        top = Math.max(0, top - pad);
+        right = Math.min(width - 1, right + pad);
+        bottom = Math.min(height - 1, bottom + pad);
+
+        const cropped = document.createElement('canvas');
+        cropped.width = right - left + 1;
+        cropped.height = bottom - top + 1;
+        cropped.getContext('2d')?.drawImage(canvas, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height);
+        cropped.toBlob((blob) => blob && onSave(new File([blob], 'signature.png', { type: 'image/png' })), 'image/png');
+    };
+
+    return (
+        <div className="space-y-2">
+            <canvas
+                ref={canvasRef}
+                aria-label="Draw your signature"
+                className="h-36 w-full touch-none rounded-md border border-dashed bg-white"
+                onPointerDown={start}
+                onPointerMove={move}
+                onPointerUp={end}
+                onPointerCancel={end}
+            />
+            <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" disabled={empty} onClick={save}>
+                    Use this signature
+                </Button>
+                <Button type="button" variant="outline" size="sm" disabled={empty} onClick={clear}>
+                    <Eraser className="size-4" />
+                    Clear
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+                    Cancel
+                </Button>
+            </div>
         </div>
     );
 }

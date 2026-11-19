@@ -1,7 +1,7 @@
 import { type BreadcrumbItem, type Business } from '@/types';
 import { Transition } from '@headlessui/react';
 import { Head, useForm } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { ComponentProps, FormEventHandler } from 'react';
 
 import BusinessFields from '@/components/business/business-fields';
 import HeadingSmall from '@/components/heading-small';
@@ -48,7 +48,40 @@ export default function BusinessSettings({ business, taxRates, canUpdate }: { bu
         payment_terms_days: String(business.payment_terms_days),
         payment_details: business.payment_details ?? '',
         send_reminders: business.send_reminders,
+        website: business.website ?? '',
+        contact_name: business.contact_name ?? '',
+        bank_name: business.bank_name ?? '',
+        bank_account_name: business.bank_account_name ?? '',
+        bank_sort_code: business.bank_sort_code ?? '',
+        bank_account_number: business.bank_account_number ?? '',
+        bank_iban: business.bank_iban ?? '',
+        bank_bic: business.bank_bic ?? '',
     });
+
+    type FooterField =
+        | 'website'
+        | 'contact_name'
+        | 'bank_name'
+        | 'bank_account_name'
+        | 'bank_sort_code'
+        | 'bank_account_number'
+        | 'bank_iban'
+        | 'bank_bic';
+
+    const footerInput = (name: FooterField, label: string, placeholder?: string, extra: Partial<ComponentProps<typeof Input>> = {}) => (
+        <div className="grid gap-2">
+            <Label htmlFor={name}>{label}</Label>
+            <Input
+                id={name}
+                value={data[name]}
+                onChange={(e) => setData(name, e.target.value)}
+                disabled={!canUpdate || processing}
+                placeholder={placeholder}
+                {...extra}
+            />
+            <InputError message={errors[name]} />
+        </div>
+    );
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -66,6 +99,25 @@ export default function BusinessSettings({ business, taxRates, canUpdate }: { bu
 
                     <form onSubmit={submit} className="space-y-6">
                         <BusinessFields data={data} setData={setData} errors={errors} disabled={!canUpdate || processing} />
+
+                        <div className="grid gap-6 sm:grid-cols-2">
+                            {footerInput('website', 'Website', 'www.example.co.uk', { autoComplete: 'url' })}
+                            {footerInput('contact_name', 'Contact person', 'Jane Smith', { autoComplete: 'name' })}
+                        </div>
+
+                        <HeadingSmall
+                            title="Bank details"
+                            description="Printed in the footer of your documents so clients can pay by bank transfer. Leave blank to hide."
+                        />
+
+                        <div className="grid gap-6 sm:grid-cols-2">
+                            {footerInput('bank_account_name', 'Account holder', 'Acme Ltd')}
+                            {footerInput('bank_name', 'Bank', 'Starling')}
+                            {footerInput('bank_sort_code', 'Sort code', '00-00-00', { inputMode: 'numeric' })}
+                            {footerInput('bank_account_number', 'Account number', '12345678', { inputMode: 'numeric' })}
+                            {footerInput('bank_iban', 'IBAN', 'GB00 XXXX 0000 0000 0000 00')}
+                            {footerInput('bank_bic', 'BIC / SWIFT', 'XXXXGB2L')}
+                        </div>
 
                         <HeadingSmall title="Estimates and invoices" description="Numbering and payment terms for new documents" />
 

@@ -38,6 +38,8 @@ class Business extends Model
         'name',
         'email',
         'phone',
+        'website',
+        'contact_name',
         'address_line_1',
         'address_line_2',
         'city',
@@ -54,12 +56,21 @@ class Business extends Model
         'deliverynote_prefix',
         'payment_terms_days',
         'payment_details',
+        'bank_name',
+        'bank_account_name',
+        'bank_sort_code',
+        'bank_account_number',
+        'bank_iban',
+        'bank_bic',
         'send_reminders',
         'document_layout',
         'document_colour',
         'document_accent_colour',
         'document_font',
         'document_footer',
+        'document_footer_details',
+        'document_show_signature',
+        'document_signature_name',
     ];
 
     /**
@@ -71,6 +82,8 @@ class Business extends Model
     {
         return [
             'send_reminders' => 'boolean',
+            'document_footer_details' => 'boolean',
+            'document_show_signature' => 'boolean',
             'stripe_charges_enabled' => 'boolean',
             'trial_ends_at' => 'datetime',
             'payment_terms_days' => 'integer',
@@ -88,6 +101,7 @@ class Business extends Model
         'pm_last_four',
         'plan_override',
         'document_logo_path',
+        'document_signature_path',
     ];
 
     protected static function booted(): void
