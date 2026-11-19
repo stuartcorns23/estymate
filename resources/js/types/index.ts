@@ -37,6 +37,8 @@ export type BusinessRole = 'owner' | 'admin' | 'member';
 export interface Business extends BusinessSummary {
     email: string | null;
     phone: string | null;
+    website: string | null;
+    contact_name: string | null;
     address_line_1: string | null;
     address_line_2: string | null;
     city: string | null;
@@ -53,6 +55,12 @@ export interface Business extends BusinessSummary {
     deliverynote_prefix: string;
     payment_terms_days: number;
     payment_details: string | null;
+    bank_name: string | null;
+    bank_account_name: string | null;
+    bank_sort_code: string | null;
+    bank_account_number: string | null;
+    bank_iban: string | null;
+    bank_bic: string | null;
     send_reminders: boolean;
 }
 

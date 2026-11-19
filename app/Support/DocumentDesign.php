@@ -24,16 +24,21 @@ class DocumentDesign
         public readonly DocumentFont $font = DocumentFont::Sans,
         public readonly ?string $footer = null,
         public readonly ?string $logo = null,
+        // Show the business's address, contact and bank details in the footer.
+        public readonly bool $footerDetails = true,
+        // The signature image as a data URI, only when it should appear on documents.
+        public readonly ?string $signature = null,
+        public readonly ?string $signatureName = null,
     ) {
-        if ($logo !== null) {
-            $size = @getimagesize($logo);
-            [$this->logoWidth, $this->logoHeight] = $size ? [$size[0], $size[1]] : [1, 1];
-        }
+        $this->logoDimensions = self::imageDimensions($logo);
+        $this->signatureDimensions = self::imageDimensions($signature);
     }
 
-    private int $logoWidth = 1;
+    /** @var array{int, int} */
+    private array $logoDimensions;
 
-    private int $logoHeight = 1;
+    /** @var array{int, int} */
+    private array $signatureDimensions;
 
     /**
      * The logo's size in pixels when scaled down to fit the box, keeping its shape.
@@ -42,9 +47,39 @@ class DocumentDesign
      */
     public function logoSize(int $maxWidth, int $maxHeight): array
     {
-        $scale = min($maxWidth / $this->logoWidth, $maxHeight / $this->logoHeight, 1);
+        return self::fit($this->logoDimensions, $maxWidth, $maxHeight);
+    }
 
-        return [max(1, (int) round($this->logoWidth * $scale)), max(1, (int) round($this->logoHeight * $scale))];
+    /**
+     * The signature's size in pixels when scaled down to fit the box, keeping its shape.
+     *
+     * @return array{int, int}
+     */
+    public function signatureSize(int $maxWidth, int $maxHeight): array
+    {
+        return self::fit($this->signatureDimensions, $maxWidth, $maxHeight);
+    }
+
+    /**
+     * @return array{int, int}
+     */
+    private static function imageDimensions(?string $dataUri): array
+    {
+        $size = $dataUri !== null ? @getimagesize($dataUri) : false;
+
+        return $size ? [max(1, $size[0]), max(1, $size[1])] : [1, 1];
+    }
+
+    /**
+     * @param  array{int, int}  $dimensions
+     * @return array{int, int}
+     */
+    private static function fit(array $dimensions, int $maxWidth, int $maxHeight): array
+    {
+        [$width, $height] = $dimensions;
+        $scale = min($maxWidth / $width, $maxHeight / $height, 1);
+
+        return [max(1, (int) round($width * $scale)), max(1, (int) round($height * $scale))];
     }
 
     public static function forBusiness(Business $business): self
@@ -56,11 +91,14 @@ class DocumentDesign
             font: DocumentFont::tryFrom((string) $business->document_font) ?? DocumentFont::Sans,
             footer: $business->document_footer ?: null,
             logo: self::logoDataUri($business->document_logo_path),
+            footerDetails: (bool) ($business->document_footer_details ?? true),
+            signature: $business->document_show_signature ? self::logoDataUri($business->document_signature_path) : null,
+            signatureName: $business->document_signature_name ?: null,
         );
     }
 
     /**
-     * The saved logo as a data URI, so the PDF renderer never has to fetch a file.
+     * A saved image (logo or signature) as a data URI, so the PDF renderer never has to fetch a file.
      */
     public static function logoDataUri(?string $path): ?string
     {
